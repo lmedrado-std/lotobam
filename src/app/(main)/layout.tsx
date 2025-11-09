@@ -11,6 +11,7 @@ import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { Header } from "@/components/layout/header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
+import { redirect } from "next/navigation";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const avatarImage = PlaceHolderImages.find((p) => p.id === 'user-avatar');

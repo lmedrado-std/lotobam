@@ -200,7 +200,7 @@ export default function GeneratePage() {
           Gerar Apostas
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Crie novas apostas para a Lotomania usando critérios avançados.
+          Crie ou importe apostas para a Lotomania usando critérios avançados.
         </p>
       </div>
 
@@ -294,6 +294,16 @@ export default function GeneratePage() {
           </Form>
         </CardContent>
       </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Importar Arquivo</CardTitle>
+          <CardDescription>Faça upload de seus próprios números e estatísticas.</CardDescription>
+        </CardHeader>
+        <CardContent>
+           <p>Em breve, você poderá fazer upload de arquivos CSV, TXT e JSON para gerar apostas ou alimentar as estatísticas do sistema.</p>
+        </CardContent>
+      </Card>
 
       {generatedBets.length > 0 && (
          <Card>
@@ -339,6 +349,7 @@ export default function GeneratePage() {
                   <TableRow>
                     <TableHead className="w-[80px]">Aposta</TableHead>
                     <TableHead>Números</TableHead>
+  
                   </TableRow>
                 </TableHeader>
                 <TableBody>

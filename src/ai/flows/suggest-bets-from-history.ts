@@ -26,6 +26,7 @@ const SuggestBetsFromHistoryInputSchema = z.object({
   numberOfBets: z
     .number()
     .describe('The number of bet combinations to suggest.'),
+  manualInclusion: z.array(z.number()).describe('An optional list of numbers to manually include in suggestions.'),
   manualExclusion: z.array(z.number()).describe('An optional list of numbers to manually exclude from suggestions.'),
 });
 export type SuggestBetsFromHistoryInput = z.infer<typeof SuggestBetsFromHistoryInputSchema>;
@@ -57,7 +58,8 @@ const prompt = ai.definePrompt({
   User's Request:
   - Strategy: {{strategy}}
   - Number of Bets to Generate: {{numberOfBets}}
-  - Numbers to Manually Exclude: {{#if manualExclusion}}{{manualExclusion}}{{else}}None{{/if}}
+  - Numbers to Manually Include (MUST be in every bet): {{#if manualInclusion}}{{manualInclusion}}{{else}}None{{/if}}
+  - Numbers to Manually Exclude (MUST NOT be in any bet): {{#if manualExclusion}}{{manualExclusion}}{{else}}None{{/if}}
 
   Your Task:
   1.  Generate {{numberOfBets}} new bet suggestions based on the chosen strategy:
@@ -65,15 +67,18 @@ const prompt = ai.definePrompt({
       - "cold": Prioritize the "cold" numbers provided.
       - "balanced": Create a mix of hot and cold numbers, and also include some numbers from the mid-range of frequency.
       - "unseen": Prioritize numbers that are NOT in the hot or cold lists. These are numbers that haven't been drawn much, or at all, in the provided dataset.
+      - "unseen_bets": Generate bets that are completely different from the ones provided in the source data.
 
   2.  Each bet MUST contain exactly 50 unique numbers.
       - The numbers must be between 0 and 99 (inclusive).
 
-  3.  You MUST NOT use any of the numbers from the "Numbers to Manually Exclude" list in your suggestions.
+  3.  You MUST include all numbers from the "Numbers to Manually Include" list in every single bet generated.
+  
+  4.  You MUST NOT use any of the numbers from the "Numbers to Manually Exclude" list in your suggestions.
 
-  4.  Provide a brief analysis explaining your choices. For example, mention a few hot or cold numbers you used and how you incorporated the strategy. For the "unseen" strategy, mention that you focused on numbers that were not statistically relevant in the provided data.
+  5.  Provide a brief analysis explaining your choices. For example, mention a few hot or cold numbers you used and how you incorporated the strategy. For the "unseen" strategy, mention that you focused on numbers that were not statistically relevant in the provided data.
 
-  5.  CRITICAL: You MUST return your response as a single, valid JSON object. Do not add any text or formatting before or after the JSON object. The JSON object must strictly adhere to the following structure:
+  6.  CRITICAL: You MUST return your response as a single, valid JSON object. Do not add any text or formatting before or after the JSON object. The JSON object must strictly adhere to the following structure:
       {
         "suggestions": [
           [... 50 numbers ...],
@@ -97,5 +102,6 @@ const suggestBetsFromHistoryFlow = ai.defineFlow(
     return output!;
   }
 );
+
 
 

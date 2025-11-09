@@ -72,6 +72,7 @@ const formSchema = z.object({
     .max(100, { message: 'A quantidade não pode ser maior que 100.' }),
   manualNumbers: z.string().optional(),
   aiStrategy: z.string().optional(),
+  numbersToInclude: z.string().optional(),
   numbersToAvoid: z.string().optional(),
 }).refine(data => {
   if (data.dataSource === 'padrao' && (data.generationMode === 'completar_manual' || data.generationMode === 'excluir_numeros')) {
@@ -231,6 +232,7 @@ export default function GeneratePage() {
       generationMode: 'aleatorio',
       manualNumbers: '',
       aiStrategy: 'balanced',
+      numbersToInclude: '',
       numbersToAvoid: ''
     },
   });
@@ -257,6 +259,7 @@ export default function GeneratePage() {
     stats: { hotNumbers: number[]; coldNumbers: number[] },
     quantity: number,
     strategy: string,
+    inclusionList: number[],
     exclusionList: number[],
     existingBets: Bet[] = []
   ): Promise<Bet[]> => {
@@ -267,6 +270,7 @@ export default function GeneratePage() {
       stats,
       strategy: strategy,
       numberOfBets: quantity,
+      manualInclusion: inclusionList,
       manualExclusion: exclusionList,
     });
   
@@ -297,13 +301,27 @@ export default function GeneratePage() {
     setGeneratedBets([]);
 
     try {
+        const inclusionList = Array.from(parseManualNumbers(data.numbersToInclude));
+        const exclusionList = Array.from(parseManualNumbers(data.numbersToAvoid));
+
+        if (inclusionList.length >= 50) {
+            toast({
+                variant: 'destructive',
+                title: 'Muitos números para incluir',
+                description: 'Você especificou 50 ou mais números para incluir. A aposta será apenas esses números.',
+            });
+            setGeneratedBets([inclusionList.slice(0, 50).sort(lottoSort)]);
+            setIsGenerating(false);
+            return;
+        }
+
+
         if (data.dataSource === 'historico') {
             toast({ title: 'A IA está pensando...', description: 'Analisando o histórico de concursos para criar as melhores apostas.' });
             const historyResults = sampleData.results.map(r => r.numeros);
             const stats = getNumberStats(historyResults);
-            const exclusionList = Array.from(parseManualNumbers(data.numbersToAvoid));
-
-            const bets = await callAiSuggestBets(stats, data.quantity, data.aiStrategy || 'balanced', exclusionList);
+            
+            const bets = await callAiSuggestBets(stats, data.quantity, data.aiStrategy || 'balanced', inclusionList, exclusionList);
             setGeneratedBets(bets);
 
         } else if (data.dataSource === 'arquivo') {
@@ -332,9 +350,8 @@ export default function GeneratePage() {
 
             toast({ title: 'Analisando e gerando apostas...', description: `Usando a estratégia "${data.aiStrategy}" com base nos dados do arquivo.` });
             const stats = getNumberStats(analyzedData.results);
-            const exclusionList = Array.from(parseManualNumbers(data.numbersToAvoid));
-
-            const bets = await callAiSuggestBets(stats, data.quantity, data.aiStrategy || 'balanced', exclusionList, analyzedData.results);
+            
+            const bets = await callAiSuggestBets(stats, data.quantity, data.aiStrategy || 'balanced', inclusionList, exclusionList, analyzedData.results);
             setGeneratedBets(bets);
             if(bets.length > 0) {
               toast({ title: 'Apostas geradas com base no arquivo!', description: `Análise concluída. ${bets.length} novas apostas foram criadas.` });
@@ -353,7 +370,13 @@ export default function GeneratePage() {
                 }
             } else if (data.generationMode === 'excluir_numeros') {
                 if (initialSet.size > 50) {
-                    throw new Error("Você não pode excluir mais de 50 números, pois é impossível gerar uma aposta.");
+                    toast({
+                      variant: "destructive",
+                      title: "Erro de Lógica",
+                      description: "Você não pode excluir mais de 50 números, pois é impossível gerar uma aposta.",
+                    });
+                    setIsGenerating(false);
+                    return;
                 }
                 bets = Array.from({ length: data.quantity }, () => generateBet('aleatorio', initialSet));
             } else { // aleatorio
@@ -639,9 +662,13 @@ export default function GeneratePage() {
                             <FormControl><RadioGroupItem value="balanced" /></FormControl>
                             <FormLabel className="font-normal">Balanceado (Mix de Estratégias)</FormLabel>
                           </FormItem>
-                          <FormItem className="flex items-center space-x-3 space-y-0">
+                           <FormItem className="flex items-center space-x-3 space-y-0">
                             <FormControl><RadioGroupItem value="unseen" /></FormControl>
-                            <FormLabel className="font-normal">Inéditos (Números Não Sorteados na Fonte)</FormLabel>
+                            <FormLabel className="font-normal">Inéditos (Números não sorteados na fonte)</FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl><RadioGroupItem value="unseen_bets" /></FormControl>
+                            <FormLabel className="font-normal">Jogos Inéditos (Diferentes dos importados)</FormLabel>
                           </FormItem>
                         </RadioGroup>
                       </FormControl>
@@ -679,6 +706,29 @@ export default function GeneratePage() {
                 </div>
               )}
               
+              {/* Numbers to Include (for AI) */}
+              {(selectedDataSource === 'historico' || selectedDataSource === 'arquivo') && (
+                 <FormField
+                  control={form.control}
+                  name="numbersToInclude"
+                  render={({ field }) => (
+                    <FormItem className="lg:col-span-3">
+                      <FormLabel>Números para Incluir (Opcional)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Digite números para a IA fixar. Ex: 10 20 30"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        A IA irá incluir estes números em todas as apostas geradas e completará o restante.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
               {/* Numbers to Avoid (for AI) */}
               {(selectedDataSource === 'historico' || selectedDataSource === 'arquivo') && (
                  <FormField
@@ -694,7 +744,7 @@ export default function GeneratePage() {
                         />
                       </FormControl>
                       <FormDescription>
-                        A IA não usará esses números ao gerar as apostas, mesmo que sejam estatisticamente relevantes na fonte de dados.
+                        A IA não usará esses números ao gerar as apostas, mesmo que sejam estatisticamente relevantes.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

@@ -40,15 +40,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Download, Sparkles, Trash2, FileText, FileJson, FileSpreadsheet, Upload } from 'lucide-react';
+import { Bookmark, Download, Sparkles, Trash2, FileSpreadsheet, Upload } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -136,21 +130,12 @@ function generateBet(mode: string, exclusionSet: Set<number> = new Set()): Bet {
 
 
 // Helper to format bets into a string
-const formatBets = (bets: Bet[], format: 'csv' | 'json' | 'txt'): string => {
+const formatBets = (bets: Bet[], format: 'csv'): string => {
   const pad = (n: number) => n.toString().padStart(2, '0');
   
-  if (format === 'json') {
-    return JSON.stringify(bets.map((bet, i) => ({ id: i + 1, numbers: bet })), null, 2);
-  }
-  
-  if (format === 'csv') {
-    const header = Array.from({ length: 50 }, (_, i) => `num${i + 1}`).join(',');
-    const rows = bets.map(bet => bet.map(pad).join(','));
-    return `id,${header}\n${rows.map((row, i) => `${i + 1},${row}`).join('\n')}`;
-  }
-
-  // txt format
-  return bets.map(bet => bet.map(pad).join(' ')).join('\n');
+  const header = Array.from({ length: 50 }, (_, i) => `num${i + 1}`).join(',');
+  const rows = bets.map(bet => bet.map(pad).join(','));
+  return `id,${header}\n${rows.map((row, i) => `${i + 1},${row}`).join('\n')}`;
 };
 
 // Helper to trigger file download
@@ -167,19 +152,6 @@ const downloadFile = (content: string, fileName: string, contentType: string) =>
 };
 
 const LottoGrid = ({ bet }: { bet: Bet }) => {
-  const numbersGrid = Array.from({ length: 10 }, (_, rowIndex) =>
-    Array.from({ length: 10 }, (_, colIndex) => {
-      let num = rowIndex * 10 + colIndex;
-      if(rowIndex === 0 && colIndex === 0) num = 0
-      else if (colIndex === 0) num = (rowIndex * 10)
-      
-      const n = rowIndex * 10 + colIndex + 1;
-      if (n > 100) return 0;
-      if (n === 100) return 0;
-      return n;
-    })
-  );
-
   const finalGrid = Array.from({ length: 100 }, (_, i) => i).sort((a,b) => {
       if(a === 0) return 1;
       if(b === 0) return -1;
@@ -376,9 +348,9 @@ export default function GeneratePage() {
 
         if (allSuggestions.length < quantity) {
           toast({
-            variant: 'destructive',
-            title: 'Não foi possível gerar jogos inéditos',
-            description: `A IA tentou, mas não conseguiu criar ${quantity} jogos que já não estivessem no seu arquivo. Foram gerados ${allSuggestions.length} jogos.`,
+            variant: 'default',
+            title: 'Não foi possível gerar todos os jogos inéditos',
+            description: `A IA tentou, mas não conseguiu criar ${quantity} jogos que já não estivessem no seu arquivo. Foram gerados ${allSuggestions.length} jogos únicos.`,
           })
         }
 
@@ -386,7 +358,7 @@ export default function GeneratePage() {
         
         toast({
           title: 'Apostas geradas com base no arquivo!',
-          description: `Análise concluída. ${allSuggestions.length} novas apostas foram criadas.`,
+          description: `Análise concluída. ${allSuggestions.slice(0, quantity).length} novas apostas foram criadas.`,
         })
 
     } catch (error) {
@@ -522,7 +494,7 @@ export default function GeneratePage() {
     setGeneratedBets([]);
   }
 
-  function handleExport(format: 'csv' | 'json' | 'txt') {
+  function handleExport(format: 'csv') {
     if (generatedBets.length === 0) {
       toast({
         variant: 'destructive',
@@ -532,19 +504,12 @@ export default function GeneratePage() {
       return;
     }
     
-    const fileMap = {
-      csv: { extension: 'csv', contentType: 'text/csv;charset=utf-8;' },
-      json: { extension: 'json', contentType: 'application/json' },
-      txt: { extension: 'txt', contentType: 'text/plain' },
-    };
-
-    const { extension, contentType } = fileMap[format];
     const fileContent = formatBets(generatedBets, format);
-    downloadFile(fileContent, `lotomania-apostas-${Date.now()}.${extension}`, contentType);
+    downloadFile(fileContent, `lotomania-apostas-${Date.now()}.csv`, 'text/csv;charset=utf-8;');
 
     toast({
       title: 'Exportação Concluída',
-      description: `Seu arquivo foi baixado com sucesso.`,
+      description: `Seu arquivo .csv foi baixado. Você pode abri-lo com o Excel.`,
     });
   }
 
@@ -961,25 +926,9 @@ export default function GeneratePage() {
                  <Button variant="outline" onClick={handleOpenSaveModal} disabled={isUserLoading}>
                    <Bookmark className="mr-2 h-4 w-4"/> Salvar como Modelo
                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button><Download className="mr-2 h-4 w-4"/> Exportar</Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleExport('csv')}>
-                        <FileSpreadsheet className="mr-2 h-4 w-4" />
-                        <span>Excel (CSV)</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExport('txt')}>
-                        <FileText className="mr-2 h-4 w-4" />
-                        <span>Texto (TXT)</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExport('json')}>
-                        <FileJson className="mr-2 h-4 w-4" />
-                        <span>JSON</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Button onClick={() => handleExport('csv')}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4"/> Exportar para Excel (CSV)
+                  </Button>
                  <Button variant="ghost" size="icon" onClick={handleClear} title="Limpar apostas geradas">
                    <Trash2 className="h-4 w-4"/>
                    <span className="sr-only">Limpar</span>

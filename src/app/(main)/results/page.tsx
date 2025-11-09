@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { RefreshCw, Download, Upload, X } from 'lucide-react';
+import { RefreshCw, Upload, X, ExternalLink } from 'lucide-react';
 import sampleData from '@/lib/sample-results.json';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -222,8 +222,8 @@ export default function ResultsPage() {
                   </Button>
                   <Button asChild>
                     <Link href="https://asloterias.com.br/download-todos-resultados-lotomania" target="_blank" rel="noopener noreferrer">
-                        <Download className="mr-2 h-4 w-4" />
-                        Baixar Planilha Padrão
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Acessar Site de Resultados
                     </Link>
                   </Button>
             </div>
@@ -345,5 +345,7 @@ export default function ResultsPage() {
     </div>
   );
 }
+
+    
 
     

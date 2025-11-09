@@ -1,11 +1,12 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -39,7 +40,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Download, Sparkles, Trash2, FileText, FileJson, FileSpreadsheet } from 'lucide-react';
+import { Bookmark, Download, Sparkles, Trash2, FileText, FileJson, FileSpreadsheet, Upload } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -147,6 +148,9 @@ export default function GeneratePage() {
   const [generatedBets, setGeneratedBets] = useState<Bet[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaveTemplateModalOpen, setSaveTemplateModalOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { toast } = useToast();
   const { firestore, user, isUserLoading } = useFirebase();
 
@@ -280,6 +284,26 @@ export default function GeneratePage() {
     setSaveTemplateModalOpen(true);
   }
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast({
+          variant: "destructive",
+          title: "Arquivo muito grande",
+          description: "Por favor, selecione um arquivo com menos de 5MB.",
+        });
+        setSelectedFile(null);
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -385,11 +409,34 @@ export default function GeneratePage() {
       <Card>
         <CardHeader>
           <CardTitle>Importar Arquivo</CardTitle>
-          <CardDescription>Faça upload de seus próprios números e estatísticas.</CardDescription>
+          <CardDescription>Faça upload de um arquivo .txt ou .csv para usar como base para a geração.</CardDescription>
         </CardHeader>
         <CardContent>
-           <p>Em breve, você poderá fazer upload de arquivos CSV, TXT e JSON para gerar apostas ou alimentar as estatísticas do sistema.</p>
+          <Input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+            accept=".csv, .txt"
+          />
+          <Button variant="outline" onClick={handleUploadClick}>
+            <Upload className="mr-2 h-4 w-4" />
+            Localizar Arquivo
+          </Button>
+          {selectedFile && (
+            <p className="mt-4 text-sm text-muted-foreground">
+              Arquivo selecionado: <span className="font-medium text-foreground">{selectedFile.name}</span>
+            </p>
+          )}
         </CardContent>
+        {selectedFile && (
+            <CardFooter>
+                <Button>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Gerar com Base no Arquivo
+                </Button>
+            </CardFooter>
+        )}
       </Card>
 
       {generatedBets.length > 0 && (

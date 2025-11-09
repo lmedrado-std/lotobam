@@ -39,7 +39,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Download, Sparkles, Trash2, FileText, FileJson, FileCsv } from 'lucide-react';
+import { Bookmark, Download, Sparkles, Trash2, FileText, FileJson, FileSpreadsheet } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -318,7 +318,7 @@ export default function GeneratePage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => handleExport('csv')}>
-                        <FileCsv className="mr-2 h-4 w-4" />
+                        <FileSpreadsheet className="mr-2 h-4 w-4" />
                         <span>CSV</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleExport('txt')}>
@@ -423,4 +423,3 @@ export default function GeneratePage() {
     </div>
   );
 }
-

@@ -664,11 +664,11 @@ export default function GeneratePage() {
                           </FormItem>
                            <FormItem className="flex items-center space-x-3 space-y-0">
                             <FormControl><RadioGroupItem value="unseen" /></FormControl>
-                            <FormLabel className="font-normal">Inéditos (Números não sorteados na fonte)</FormLabel>
+                            <FormLabel className="font-normal">Surpresa (Foco em números 'esquecidos')</FormLabel>
                           </FormItem>
                           <FormItem className="flex items-center space-x-3 space-y-0">
                             <FormControl><RadioGroupItem value="unseen_bets" /></FormControl>
-                            <FormLabel className="font-normal">Jogos Inéditos (Diferentes dos importados)</FormLabel>
+                            <FormLabel className="font-normal">Evitar Cópias (Gerar jogos 100% novos)</FormLabel>
                           </FormItem>
                         </RadioGroup>
                       </FormControl>

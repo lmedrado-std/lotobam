@@ -40,7 +40,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Download, Sparkles, Trash2, FileSpreadsheet, Upload } from 'lucide-react';
+import { Bookmark, Download, Sparkles, Trash2, FileSpreadsheet, Upload, X } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -490,6 +490,13 @@ export default function GeneratePage() {
     }
   };
 
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
@@ -685,7 +692,7 @@ export default function GeneratePage() {
               {selectedDataSource === 'arquivo' && (
                 <div className="space-y-4 lg:col-span-3">
                     <FormLabel>Arquivo de Origem</FormLabel>
-                    <div className="flex flex-col gap-4 sm:flex-row">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                         <Input
                           type="file"
                           ref={fileInputRef}
@@ -698,8 +705,13 @@ export default function GeneratePage() {
                           Localizar Arquivo XLSX
                         </Button>
                         {selectedFile && (
-                          <div className="flex items-center rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
-                            Arquivo: <span className="ml-2 font-medium text-foreground">{selectedFile.name}</span>
+                          <div className="flex items-center justify-between rounded-md border bg-muted px-3 py-2 text-sm">
+                             <span className="text-muted-foreground">Arquivo:</span>
+                             <span className="ml-2 font-medium text-foreground truncate max-w-xs">{selectedFile.name}</span>
+                             <Button variant="ghost" size="icon" onClick={handleRemoveFile} className="ml-2 h-6 w-6">
+                                <X className="h-4 w-4" />
+                                <span className="sr-only">Remover arquivo</span>
+                             </Button>
                           </div>
                         )}
                       </div>

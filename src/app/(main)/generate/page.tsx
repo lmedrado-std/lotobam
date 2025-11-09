@@ -57,7 +57,6 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import sampleData from '@/lib/sample-results.json';
 import { suggestBetsFromHistory, type SuggestBetsFromHistoryOutput } from '@/ai/flows/suggest-bets-from-history';
-import { analyzeImportedData } from '@/ai/flows/analyze-imported-data';
 import { cn } from '@/lib/utils';
 
 
@@ -122,6 +121,27 @@ function generateBet(mode: string, exclusionSet: Set<number> = new Set()): Bet {
     }
   }
   return Array.from(bet).sort(lottoSort);
+}
+
+/**
+ * Recebe conteúdo de arquivo (CSV/TXT) e retorna array de arrays com 20 números sorteados de cada linha válida.
+ */
+function parseLotteryFile(fileContent: string): number[][] {
+  if (!fileContent || !fileContent.trim()) return [];
+  // separa por linhas
+  const lines = fileContent.split(/\r?\n/);
+  const results: number[][] = [];
+  for (const line of lines) {
+    // ignora linhas sem conteúdo suficiente
+    const parts = line.split(/[;,]/); // aceita ponto-e-vírgula ou vírgula
+    if (parts.length < 22) continue;
+    // pega os 20 números após concurso/data
+    const contestNumbers = parts.slice(2, 22).map(n => parseInt(n.trim(), 10));
+    if (contestNumbers.length === 20 && contestNumbers.every(n => !isNaN(n) && n >= 0 && n <= 99)) {
+      results.push(contestNumbers);
+    }
+  }
+  return results;
 }
 
 
@@ -334,36 +354,25 @@ export default function GeneratePage() {
                 setIsGenerating(false);
                 return;
             }
-            toast({ title: 'Lendo seu arquivo...', description: 'Extraindo os números para análise da IA.' });
+            toast({ title: 'Lendo seu arquivo...', description: 'Extraindo os números para análise.' });
             
             const fileContent = await selectedFile.text();
+            const parsedResult = parseLotteryFile(fileContent);
 
-            if (!fileContent.trim()) {
+            if (parsedResult.length === 0) {
                  toast({
                     variant: "destructive",
                     title: "Arquivo Inválido ou Vazio",
-                    description: "Nenhum número de aposta ou resultado válido foi encontrado no arquivo. Verifique o formato.",
+                    description: "Nenhum número de aposta ou resultado válido foi encontrado. Verifique se o arquivo segue o padrão: concurso;data;20 dezenas.",
                 });
                 setIsGenerating(false);
                 return;
             }
 
-            const analyzedData = await analyzeImportedData({ fileContent });
-
-            if (!analyzedData || !analyzedData.results || analyzedData.results.length === 0) {
-              toast({
-                variant: "destructive",
-                title: "Arquivo Inválido ou Vazio",
-                description: "A IA não conseguiu extrair dados do arquivo. Verifique o formato e tente novamente.",
-              });
-              setIsGenerating(false);
-              return;
-            }
-
             toast({ title: 'Analisando e gerando apostas...', description: `Usando a estratégia "${data.aiStrategy}" com base nos dados do arquivo.` });
-            const stats = getNumberStats(analyzedData.results);
+            const stats = getNumberStats(parsedResult);
             
-            const bets = await callAiSuggestBets(stats, data.quantity, data.aiStrategy || 'balanced', inclusionList, exclusionList, analyzedData.results);
+            const bets = await callAiSuggestBets(stats, data.quantity, data.aiStrategy || 'balanced', inclusionList, exclusionList, parsedResult);
             setGeneratedBets(bets);
             if(bets.length > 0) {
               toast({ title: 'Apostas geradas com base no arquivo!', description: `Análise concluída. ${bets.length} novas apostas foram criadas.` });

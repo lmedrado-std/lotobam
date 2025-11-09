@@ -52,7 +52,7 @@ Based on your analysis of this data, you will suggest {{numberOfBets}} bet combi
 
 You must also provide a brief summary of your analysis, highlighting any trends, patterns, or key insights you discovered in the data that influenced your suggestions.
 
-Please ensure your final response is a valid JSON object that strictly follows the specified output schema.
+Your final response MUST be a valid JSON object that strictly follows the specified output schema. Do not include any other text or formatting outside of the JSON object.
 `,
 });
 

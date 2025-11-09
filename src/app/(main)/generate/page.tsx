@@ -63,6 +63,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import sampleData from '@/lib/sample-results.json';
 import { suggestBetsFromHistory } from '@/ai/flows/suggest-bets-from-history';
+import { analyzeImportedData } from '@/ai/flows/analyze-imported-data';
 import { cn } from '@/lib/utils';
 
 
@@ -209,13 +210,13 @@ const LottoGrid = ({ bet }: { bet: Bet }) => {
   );
 };
 
-const getNumberStats = (data: any[]) => {
+const getNumberStats = (results: {numeros: number[]}[]) => {
     const frequency: { [key: number]: number } = {};
     for (let i = 0; i <= 99; i++) {
         frequency[i] = 0;
     }
 
-    data.forEach(result => {
+    results.forEach(result => {
         result.numeros.forEach((num: number) => {
             if (frequency[num] !== undefined) {
                 frequency[num]++;
@@ -230,17 +231,18 @@ const getNumberStats = (data: any[]) => {
     return { hotNumbers, coldNumbers };
 };
 
-const getNumberStatsFromFileContent = (content: string) => {
-    const numbers = content.match(/\d+/g)?.map(Number) || [];
+const getNumberStatsFromResultsArray = (results: number[][]) => {
     const frequency: { [key: number]: number } = {};
     for (let i = 0; i <= 99; i++) {
         frequency[i] = 0;
     }
 
-    numbers.forEach(num => {
-        if (frequency[num] !== undefined) {
-            frequency[num]++;
-        }
+    results.forEach(contestNumbers => {
+        contestNumbers.forEach(num => {
+            if (frequency[num] !== undefined) {
+                frequency[num]++;
+            }
+        });
     });
 
     const sortedNumbers = Object.entries(frequency).sort((a, b) => b[1] - a[1]);
@@ -321,32 +323,40 @@ export default function GeneratePage() {
 
     try {
         const fileContent = await selectedFile.text();
-        const { quantity } = form.getValues();
-        const { aiFileStrategy } = fileImportForm.getValues();
-        const stats = getNumberStatsFromFileContent(fileContent);
-
+        
         toast({
-          title: 'A IA está analisando seu arquivo...',
-          description: `Usando a estratégia "${aiFileStrategy}" para gerar as apostas.`,
+          title: 'A IA está lendo seu arquivo...',
+          description: 'Extraindo os números dos concursos para análise.',
         });
 
-        const response = await suggestBetsFromHistory({
+        const extractionResponse = await analyzeImportedData({ fileContent });
+        const stats = getNumberStatsFromResultsArray(extractionResponse.results);
+
+        const { quantity } = form.getValues();
+        const { aiFileStrategy } = fileImportForm.getValues();
+
+        toast({
+          title: 'Analisando e gerando apostas...',
+          description: `Usando a estratégia "${aiFileStrategy}" com base nos dados do arquivo.`,
+        });
+
+        const suggestionResponse = await suggestBetsFromHistory({
             stats,
             strategy: aiFileStrategy,
             numberOfBets: quantity,
         });
 
-        setGeneratedBets(response.suggestions.map(bet => bet.sort(lottoSort)));
+        setGeneratedBets(suggestionResponse.suggestions.map(bet => bet.sort(lottoSort)));
         toast({
           title: 'Apostas geradas com base no arquivo!',
-          description: response.analysis,
+          description: suggestionResponse.analysis,
         })
     } catch (error) {
         console.error("File-based AI generation failed:", error);
         toast({
             variant: "destructive",
-            title: "Erro ao ler arquivo ou gerar apostas",
-            description: "Verifique o formato do arquivo ou tente novamente.",
+            title: "Erro ao analisar o arquivo",
+            description: "Verifique se o arquivo está no formato correto (CSV ou TXT) ou tente novamente.",
         });
     } finally {
         setIsGenerating(false);
@@ -404,7 +414,9 @@ export default function GeneratePage() {
         }
         try {
           const fileContent = await selectedFile.text();
-          exclusionSet = parseManualNumbers(fileContent);
+          const extractionResponse = await analyzeImportedData({ fileContent });
+          const numbersFromFile = extractionResponse.results.flat();
+          exclusionSet = new Set(numbersFromFile);
         } catch (e) {
           toast({
             variant: "destructive",

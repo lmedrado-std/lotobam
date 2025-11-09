@@ -336,16 +336,7 @@ export default function GeneratePage() {
             }
             toast({ title: 'Lendo seu arquivo...', description: 'Extraindo os números para análise da IA.' });
             
-            const rawFileContent = await selectedFile.text();
-            
-            // Pre-process the file content before sending to AI
-            const fileLines = rawFileContent.split('\n');
-            const dataLines = fileLines.filter(line => {
-                // Keep lines that have at least 15 numbers, a good heuristic for a data line
-                const numbers = line.match(/\d+/g);
-                return numbers && numbers.length >= 15;
-            });
-            const fileContent = dataLines.join('\n');
+            const fileContent = await selectedFile.text();
 
             if (!fileContent.trim()) {
                  toast({
@@ -897,3 +888,5 @@ export default function GeneratePage() {
     </div>
   );
 }
+
+    

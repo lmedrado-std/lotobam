@@ -235,9 +235,6 @@ export default function GeneratePage() {
                       <SelectContent>
                         <SelectItem value="aleatorio">Aleatório Puro</SelectItem>
                         <SelectItem value="completar_manual">Completar Números</SelectItem>
-                        <SelectItem value="balanceado" disabled>Balanceado por Faixa (em breve)</SelectItem>
-                        <SelectItem value="soma_alvo" disabled>Soma Alvo (em breve)</SelectItem>
-                        <SelectItem value="hot_cold" disabled>Hot/Cold (em breve)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>

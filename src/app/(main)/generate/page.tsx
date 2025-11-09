@@ -112,7 +112,7 @@ function generateBet(mode: string, exclusionSet: Set<number> = new Set()): Bet {
   }
 
   while (bet.size < 50) {
-    const randomNumber = Math.floor(Math.random() * 100);
+    const randomNumber = Math.floor(Math.random() * 100); // 0-99
     if (!bet.has(randomNumber) && !exclusionSet.has(randomNumber)) {
       bet.add(randomNumber);
     }

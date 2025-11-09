@@ -823,7 +823,7 @@ export default function GeneratePage() {
                    <Bookmark className="mr-2 h-4 w-4"/> Salvar como Modelo
                  </Button>
                   <Button onClick={handleExport}>
-                    <FileSpreadsheet className="mr-2 h-4 w-4"/> Exportar para XLSX
+                    <FileSpreadsheet className="mr-2 h-4 w-4"/> Salvar em Excel
                   </Button>
                  <Button variant="ghost" size="icon" onClick={handleClear} title="Limpar apostas geradas">
                    <Trash2 className="h-4 w-4"/>
@@ -914,4 +914,5 @@ export default function GeneratePage() {
     
 
     
+
 

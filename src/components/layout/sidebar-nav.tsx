@@ -8,11 +8,13 @@ import {
 } from "@/components/ui/sidebar";
 import {
   Sparkles,
+  Award,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/generate", label: "Gerar Apostas", icon: Sparkles },
+  { href: "/results", label: "Resultados", icon: Award },
 ];
 
 export function SidebarNav() {

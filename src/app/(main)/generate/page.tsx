@@ -335,14 +335,35 @@ export default function GeneratePage() {
                 return;
             }
             toast({ title: 'Lendo seu arquivo...', description: 'Extraindo os números para análise da IA.' });
-            const fileContent = await selectedFile.text();
             
+            const rawFileContent = await selectedFile.text();
+            
+            // Pre-process the file content before sending to AI
+            const fileLines = rawFileContent.split('\n');
+            const dataLines = fileLines.filter(line => {
+                // Keep lines that have at least 15 numbers, a good heuristic for a data line
+                const numbers = line.match(/\d+/g);
+                return numbers && numbers.length >= 15;
+            });
+            const fileContent = dataLines.join('\n');
+
+            if (!fileContent.trim()) {
+                 toast({
+                    variant: "destructive",
+                    title: "Arquivo Inválido ou Vazio",
+                    description: "Nenhum número de aposta ou resultado válido foi encontrado no arquivo. Verifique o formato.",
+                });
+                setIsGenerating(false);
+                return;
+            }
+
             const analyzedData = await analyzeImportedData({ fileContent });
+
             if (!analyzedData || !analyzedData.results || analyzedData.results.length === 0) {
               toast({
                 variant: "destructive",
                 title: "Arquivo Inválido ou Vazio",
-                description: "Nenhum número de aposta ou resultado válido foi encontrado no arquivo. Verifique o formato.",
+                description: "A IA não conseguiu extrair dados do arquivo. Verifique o formato e tente novamente.",
               });
               setIsGenerating(false);
               return;

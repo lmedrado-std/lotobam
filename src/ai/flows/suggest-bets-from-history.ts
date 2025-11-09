@@ -61,7 +61,7 @@ const prompt = ai.definePrompt({
 
   2.  Generate {{numberOfBets}} new bet suggestions.
       - Each bet MUST contain exactly 50 unique numbers.
-      - The numbers must be between 0 and 99 (inclusive, but Lotomania is 0-99, so 100 is not a valid number).
+      - The numbers must be between 0 and 99 (inclusive).
 
   3.  Provide a brief analysis explaining your choices. For example, mention a few hot or cold numbers you identified and how you used them.
 

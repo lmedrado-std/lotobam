@@ -383,7 +383,7 @@ export default function GeneratePage() {
     setGeneratedBets([]);
   }
 
-  function handleExport(format: 'csv') {
+  function handleExport() {
     if (generatedBets.length === 0) {
       toast({
         variant: 'destructive',
@@ -393,7 +393,7 @@ export default function GeneratePage() {
       return;
     }
     
-    const fileContent = formatBets(generatedBets, format);
+    const fileContent = formatBets(generatedBets, 'csv');
     downloadFile(fileContent, `lotomania-apostas-${Date.now()}.csv`, 'text/csv;charset=utf-8;');
 
     toast({
@@ -512,23 +512,20 @@ export default function GeneratePage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Critérios de Geração</CardTitle>
-          <CardDescription>
-            Defina a fonte de dados e os critérios para criar suas apostas.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"
-            >
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <CardHeader>
+              <CardTitle>Critérios de Geração</CardTitle>
+              <CardDescription>
+                Defina a fonte de dados e os critérios para criar suas apostas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               <FormField
                 control={form.control}
                 name="dataSource"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="lg:col-span-1">
                     <FormLabel>Fonte de Dados</FormLabel>
                     <Select
                       onValueChange={field.onChange}
@@ -557,7 +554,7 @@ export default function GeneratePage() {
                 control={form.control}
                 name="quantity"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="lg:col-span-1">
                     <FormLabel>Quantidade de Apostas</FormLabel>
                     <FormControl>
                       <Input type="number" placeholder="Ex: 10" {...field} />
@@ -570,20 +567,13 @@ export default function GeneratePage() {
                 )}
               />
 
-              <div className="md:col-start-3 md:flex md:items-end md:justify-end">
-                <Button type="submit" disabled={isGenerating} className="w-full md:w-auto">
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  {isGenerating ? 'Gerando...' : 'Gerar Apostas'}
-                </Button>
-              </div>
-
               {/* Standard Generation Mode */}
               {selectedDataSource === 'padrao' && (
                 <FormField
                   control={form.control}
                   name="generationMode"
                   render={({ field }) => (
-                    <FormItem className="md:col-span-3">
+                    <FormItem className="lg:col-span-1">
                       <FormLabel>Modo de Geração</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
@@ -612,7 +602,7 @@ export default function GeneratePage() {
                   control={form.control}
                   name="manualNumbers"
                   render={({ field }) => (
-                    <FormItem className="md:col-span-3">
+                    <FormItem className="lg:col-span-3">
                       <FormLabel>{getManualNumbersLabel()}</FormLabel>
                       <FormControl>
                         <Textarea
@@ -635,7 +625,7 @@ export default function GeneratePage() {
                   control={form.control}
                   name="aiStrategy"
                   render={({ field }) => (
-                    <FormItem className="space-y-3 md:col-span-3">
+                    <FormItem className="space-y-3 lg:col-span-3">
                       <FormLabel>Estratégia da IA</FormLabel>
                       <FormControl>
                         <RadioGroup
@@ -668,7 +658,7 @@ export default function GeneratePage() {
 
               {/* File Upload */}
               {selectedDataSource === 'arquivo' && (
-                <div className="space-y-4 md:col-span-3">
+                <div className="space-y-4 lg:col-span-3">
                     <FormLabel>Arquivo de Origem</FormLabel>
                     <div className="flex flex-col gap-4 sm:flex-row">
                         <Input
@@ -678,7 +668,7 @@ export default function GeneratePage() {
                           className="hidden"
                           accept=".csv, .txt"
                         />
-                        <Button variant="outline" onClick={handleUploadClick} className="w-full sm:w-auto">
+                        <Button type="button" variant="outline" onClick={handleUploadClick} className="w-full sm:w-auto">
                           <Upload className="mr-2 h-4 w-4" />
                           Localizar Arquivo
                         </Button>
@@ -697,7 +687,7 @@ export default function GeneratePage() {
                   control={form.control}
                   name="numbersToAvoid"
                   render={({ field }) => (
-                    <FormItem className="md:col-span-3">
+                    <FormItem className="lg:col-span-3">
                       <FormLabel>Números para Evitar (Opcional)</FormLabel>
                       <FormControl>
                         <Textarea
@@ -713,10 +703,15 @@ export default function GeneratePage() {
                   )}
                 />
               )}
-
-            </form>
-          </Form>
-        </CardContent>
+            </CardContent>
+            <CardFooter>
+              <Button type="submit" disabled={isGenerating} className="w-full md:w-auto">
+                <Sparkles className="mr-2 h-4 w-4" />
+                {isGenerating ? 'Gerando...' : 'Gerar Apostas'}
+              </Button>
+            </CardFooter>
+          </form>
+        </Form>
       </Card>
       
       {generatedBets.length > 0 && (
@@ -729,11 +724,11 @@ export default function GeneratePage() {
                   {generatedBets.length} apostas geradas com sucesso.
                 </CardDescription>
                </div>
-               <div className="flex gap-2">
+               <div className="flex flex-wrap gap-2">
                  <Button variant="outline" onClick={handleOpenSaveModal} disabled={isUserLoading}>
                    <Bookmark className="mr-2 h-4 w-4"/> Salvar como Modelo
                  </Button>
-                  <Button onClick={() => handleExport('csv')}>
+                  <Button onClick={handleExport}>
                     <FileSpreadsheet className="mr-2 h-4 w-4"/> Exportar para Excel (CSV)
                   </Button>
                  <Button variant="ghost" size="icon" onClick={handleClear} title="Limpar apostas geradas">

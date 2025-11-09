@@ -25,11 +25,7 @@ export function AuthContent() {
   }
 
   if (!user) {
-    return (
-      <Button onClick={() => signInAnonymously(auth)}>
-        Entrar como Anônimo
-      </Button>
-    );
+    return null;
   }
 
   return (

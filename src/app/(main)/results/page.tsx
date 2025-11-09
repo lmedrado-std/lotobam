@@ -317,9 +317,9 @@ export default function ResultsPage() {
                       <TableCell>{result.data}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {result.numeros.sort((a,b) => a-b).map((num) => (
+                          {result.numeros.sort((a,b) => a-b).map((num, index) => (
                             <Badge
-                              key={num}
+                              key={`${num}-${index}`}
                               variant="secondary"
                               className="flex h-6 w-6 items-center justify-center text-xs"
                             >

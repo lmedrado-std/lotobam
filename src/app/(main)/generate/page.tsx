@@ -72,12 +72,12 @@ const formSchema = z.object({
     .max(100, { message: 'A quantidade não pode ser maior que 100.' }),
   manualNumbers: z.string().optional(),
 }).refine(data => {
-  if (data.mode === 'completar_manual') {
+  if (data.mode === 'completar_manual' || data.mode === 'excluir_numeros') {
     return !!data.manualNumbers && data.manualNumbers.trim() !== '';
   }
   return true;
 }, {
-  message: 'Por favor, insira os números que deseja fixar.',
+  message: 'Por favor, insira os números para esta operação.',
   path: ['manualNumbers'],
 });
 
@@ -97,15 +97,23 @@ function parseManualNumbers(numbersStr: string | undefined): Set<number> {
 }
 
 function generateBet(mode: string, manualNumbers: Set<number>): Bet {
-  const bet: Set<number> = mode === 'completar_manual' ? new Set(manualNumbers) : new Set();
+  let bet: Set<number>;
+
+  if (mode === 'completar_manual') {
+    bet = new Set(manualNumbers);
+  } else {
+    bet = new Set();
+  }
   
   if (bet.size >= 50) {
     return Array.from(bet).slice(0, 50).sort((a, b) => a - b);
   }
+  
+  const exclusionSet = mode === 'excluir_numeros' ? manualNumbers : new Set();
 
   while (bet.size < 50) {
     const randomNumber = Math.floor(Math.random() * 100);
-    if (!bet.has(randomNumber)) {
+    if (!bet.has(randomNumber) && !exclusionSet.has(randomNumber)) {
       bet.add(randomNumber);
     }
   }
@@ -194,6 +202,16 @@ export default function GeneratePage() {
       return;
     }
     
+    if (data.mode === 'excluir_numeros' && manualNumbersSet.size > 50) {
+      toast({
+        variant: "destructive",
+        title: "Muitos números para excluir",
+        description: "Você não pode excluir mais de 50 números, pois é impossível gerar uma aposta.",
+      });
+      setIsGenerating(false);
+      return;
+    }
+
     // Simulating generation delay
     setTimeout(() => {
       const bets = Array.from({ length: data.quantity }, () => generateBet(data.mode, manualNumbersSet));
@@ -304,6 +322,29 @@ export default function GeneratePage() {
     fileInputRef.current?.click();
   };
 
+  const getManualNumbersLabel = () => {
+    switch (selectedMode) {
+      case 'completar_manual':
+        return 'Números para Fixar';
+      case 'excluir_numeros':
+        return 'Números para Excluir';
+      default:
+        return '';
+    }
+  };
+
+  const getManualNumbersDescription = () => {
+    switch (selectedMode) {
+      case 'completar_manual':
+        return 'O sistema usará esses números e gerará o restante aleatoriamente até completar 50.';
+      case 'excluir_numeros':
+        return 'Os números inseridos aqui não aparecerão em nenhuma das apostas geradas.';
+      default:
+        return '';
+    }
+  };
+
+
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -346,6 +387,7 @@ export default function GeneratePage() {
                       <SelectContent>
                         <SelectItem value="aleatorio">Aleatório Puro</SelectItem>
                         <SelectItem value="completar_manual">Completar Números</SelectItem>
+                        <SelectItem value="excluir_numeros">Excluir Números</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
@@ -380,13 +422,13 @@ export default function GeneratePage() {
                 </Button>
               </div>
 
-              {selectedMode === 'completar_manual' && (
+              {(selectedMode === 'completar_manual' || selectedMode === 'excluir_numeros') && (
                 <FormField
                   control={form.control}
                   name="manualNumbers"
                   render={({ field }) => (
                     <FormItem className="md:col-span-3">
-                      <FormLabel>Números para Completar</FormLabel>
+                      <FormLabel>{getManualNumbersLabel()}</FormLabel>
                       <FormControl>
                         <Textarea
                           placeholder="Digite os números separados por espaço ou vírgula. Ex: 5 12 23 45 88"
@@ -394,7 +436,7 @@ export default function GeneratePage() {
                         />
                       </FormControl>
                       <FormDescription>
-                        O sistema usará esses números e gerará o restante aleatoriamente até completar 50.
+                        {getManualNumbersDescription()}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -565,3 +607,5 @@ export default function GeneratePage() {
     </div>
   );
 }
+
+    

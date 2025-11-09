@@ -63,7 +63,6 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import sampleData from '@/lib/sample-results.json';
 import { suggestBetsFromHistory } from '@/ai/flows/suggest-bets-from-history';
-import { analyzeImportedData } from '@/ai/flows/analyze-imported-data';
 import { cn } from '@/lib/utils';
 
 
@@ -91,6 +90,10 @@ const formSchema = z.object({
 const templateFormSchema = z.object({
   name: z.string().min(3, { message: 'O nome do modelo deve ter pelo menos 3 caracteres.' }),
   description: z.string().optional(),
+});
+
+const fileImportSchema = z.object({
+  aiFileStrategy: z.string(),
 });
 
 
@@ -283,6 +286,13 @@ export default function GeneratePage() {
     }
   });
 
+  const fileImportForm = useForm<z.infer<typeof fileImportSchema>>({
+    resolver: zodResolver(fileImportSchema),
+    defaultValues: {
+      aiFileStrategy: 'balanced',
+    },
+  });
+
   const selectedMode = useWatch({
     control: form.control,
     name: 'mode',
@@ -304,15 +314,17 @@ export default function GeneratePage() {
     try {
         const fileContent = await selectedFile.text();
         const { quantity } = form.getValues();
+        const { aiFileStrategy } = fileImportForm.getValues();
         const stats = getNumberStatsFromFileContent(fileContent);
 
         toast({
           title: 'A IA está analisando seu arquivo...',
-          description: 'Isso pode levar alguns segundos.',
+          description: `Usando a estratégia "${aiFileStrategy}" para gerar as apostas.`,
         });
 
-        const response = await analyzeImportedData({
+        const response = await suggestBetsFromHistory({
             stats,
+            strategy: aiFileStrategy,
             numberOfBets: quantity,
         });
 
@@ -539,6 +551,9 @@ export default function GeneratePage() {
           description: "Por favor, selecione um arquivo com menos de 5MB.",
         });
         setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
         return;
       }
       setSelectedFile(file);
@@ -700,7 +715,7 @@ export default function GeneratePage() {
                     name="aiStrategy"
                     render={({ field }) => (
                       <FormItem className="space-y-3">
-                        <FormLabel>Estratégia da IA</FormLabel>
+                        <FormLabel>Estratégia da IA (Base: Histórico de Concursos)</FormLabel>
                         <FormControl>
                           <RadioGroup
                             onValueChange={field.onChange}
@@ -771,35 +786,84 @@ export default function GeneratePage() {
       
       <Card>
         <CardHeader>
-          <CardTitle>Importar Arquivo</CardTitle>
-          <CardDescription>Faça upload de um arquivo (.txt, .csv, .xlsx) para usar como base para a geração ou para evitar números.</CardDescription>
+          <CardTitle>Gerar com Base em Arquivo</CardTitle>
+          <CardDescription>Faça upload de um arquivo (.txt, .csv) com números e use a IA para gerar apostas baseadas na análise estatística desse arquivo.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            className="hidden"
-            accept=".csv, .txt, .json, .xls, .xlsx"
-          />
-          <Button variant="outline" onClick={handleUploadClick}>
-            <Upload className="mr-2 h-4 w-4" />
-            Localizar Arquivo
-          </Button>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row">
+            <Input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+              accept=".csv, .txt, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+            />
+            <Button variant="outline" onClick={handleUploadClick} className="w-full sm:w-auto">
+              <Upload className="mr-2 h-4 w-4" />
+              Localizar Arquivo
+            </Button>
+            {selectedFile && (
+              <div className="flex items-center rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
+                Arquivo: <span className="ml-2 font-medium text-foreground">{selectedFile.name}</span>
+              </div>
+            )}
+          </div>
           {selectedFile && (
-            <p className="mt-4 text-sm text-muted-foreground">
-              Arquivo selecionado: <span className="font-medium text-foreground">{selectedFile.name}</span>
-            </p>
+            <Form {...fileImportForm}>
+              <form onSubmit={(e) => { e.preventDefault(); generateBetsWithFile(); }} className="space-y-6">
+                <FormField
+                  control={fileImportForm.control}
+                  name="aiFileStrategy"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Estratégia da IA (Base: Arquivo)</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="flex flex-col space-y-1"
+                        >
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="hot" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Usar Números Quentes do arquivo (mais frequentes)
+                            </FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="cold" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Usar Números Frios do arquivo (menos frequentes)
+                            </FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="balanced" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Balancear (mix de quentes, frios e outros)
+                            </FormLabel>
+                          </FormItem>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormDescription>
+                        A IA irá analisar as estatísticas do seu arquivo para gerar as apostas.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" disabled={isGenerating}>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    {isGenerating ? 'Analisando...' : 'Analisar Arquivo e Gerar com IA'}
+                </Button>
+              </form>
+            </Form>
           )}
         </CardContent>
-        {selectedFile && (
-            <CardFooter>
-                <Button onClick={generateBetsWithFile} disabled={isGenerating}>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    {isGenerating ? 'Analisando...' : 'Analisar e Gerar com IA'}
-                </Button>
-            </CardFooter>
-        )}
       </Card>
 
       {generatedBets.length > 0 && (

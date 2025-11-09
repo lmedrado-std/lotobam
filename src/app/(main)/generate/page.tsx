@@ -254,40 +254,41 @@ export default function GeneratePage() {
   });
 
   const callAiSuggestBets = async (
-    stats: { hotNumbers: number[]; coldNumbers: number[] }, 
-    quantity: number, 
-    strategy: string, 
+    stats: { hotNumbers: number[]; coldNumbers: number[] },
+    quantity: number,
+    strategy: string,
     exclusionList: number[],
     existingBets: Bet[] = []
   ): Promise<Bet[]> => {
-      const existingBetsSet = new Set(existingBets.map(b => JSON.stringify(b.sort(lottoSort))));
-
-      const response = await suggestBetsFromHistory({
-          stats,
-          strategy: strategy,
-          numberOfBets: quantity,
-          manualExclusion: exclusionList,
+    const existingBetsSet = new Set(existingBets.map(b => JSON.stringify(b.sort(lottoSort))));
+  
+    // Single call to the AI
+    const response = await suggestBetsFromHistory({
+      stats,
+      strategy: strategy,
+      numberOfBets: quantity,
+      manualExclusion: exclusionList,
+    });
+  
+    if (!response || !response.suggestions) {
+      throw new Error("A IA retornou uma resposta inválida. Tente novamente.");
+    }
+  
+    const newUniqueSuggestions = response.suggestions.filter(suggestion => {
+      const sortedSuggestion = [...suggestion].sort(lottoSort);
+      const suggestionKey = JSON.stringify(sortedSuggestion);
+      return !existingBetsSet.has(suggestionKey);
+    });
+  
+    if (newUniqueSuggestions.length < quantity) {
+      toast({
+        variant: 'default',
+        title: 'Não foi possível gerar todos os jogos inéditos',
+        description: `A IA tentou, mas só conseguiu criar ${newUniqueSuggestions.length} jogos únicos.`,
       });
-      
-      if (!response || !response.suggestions) {
-        throw new Error("A IA retornou uma resposta inválida. Tente novamente.");
-      }
-
-      const newUniqueSuggestions = response.suggestions.filter(suggestion => {
-          const sortedSuggestion = [...suggestion].sort(lottoSort);
-          const suggestionKey = JSON.stringify(sortedSuggestion);
-          return !existingBetsSet.has(suggestionKey);
-      });
-
-      if (newUniqueSuggestions.length < quantity) {
-        toast({
-          variant: 'default',
-          title: 'Não foi possível gerar todos os jogos inéditos',
-          description: `A IA tentou, mas só conseguiu criar ${newUniqueSuggestions.length} jogos únicos.`,
-        })
-      }
-
-      return newUniqueSuggestions.slice(0, quantity).map(bet => bet.sort(lottoSort));
+    }
+  
+    return newUniqueSuggestions.slice(0, quantity).map(bet => bet.sort(lottoSort));
   };
 
 
@@ -637,6 +638,10 @@ export default function GeneratePage() {
                           <FormItem className="flex items-center space-x-3 space-y-0">
                             <FormControl><RadioGroupItem value="balanced" /></FormControl>
                             <FormLabel className="font-normal">Balanceado (Mix de Estratégias)</FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl><RadioGroupItem value="unseen" /></FormControl>
+                            <FormLabel className="font-normal">Inéditos (Números Não Sorteados na Fonte)</FormLabel>
                           </FormItem>
                         </RadioGroup>
                       </FormControl>

@@ -22,7 +22,7 @@ const SuggestBetsFromHistoryInputSchema = z.object({
   stats: StatsSchema.describe('The statistics derived from the historical data.'),
   strategy: z
     .string()
-    .describe('The strategy to use for generating bets. Can be "hot", "cold", or "balanced".'),
+    .describe('The strategy to use for generating bets. Can be "hot", "cold", "balanced", or "unseen".'),
   numberOfBets: z
     .number()
     .describe('The number of bet combinations to suggest.'),
@@ -64,13 +64,14 @@ const prompt = ai.definePrompt({
       - "hot": Prioritize the "hot" numbers provided.
       - "cold": Prioritize the "cold" numbers provided.
       - "balanced": Create a mix of hot and cold numbers, and also include some numbers from the mid-range of frequency.
+      - "unseen": Prioritize numbers that are NOT in the hot or cold lists. These are numbers that haven't been drawn much, or at all, in the provided dataset.
 
   2.  Each bet MUST contain exactly 50 unique numbers.
       - The numbers must be between 0 and 99 (inclusive).
 
   3.  You MUST NOT use any of the numbers from the "Numbers to Manually Exclude" list in your suggestions.
 
-  4.  Provide a brief analysis explaining your choices. For example, mention a few hot or cold numbers you used and how you incorporated the strategy.
+  4.  Provide a brief analysis explaining your choices. For example, mention a few hot or cold numbers you used and how you incorporated the strategy. For the "unseen" strategy, mention that you focused on numbers that were not statistically relevant in the provided data.
 
   5.  CRITICAL: You MUST return your response as a single, valid JSON object. Do not add any text or formatting before or after the JSON object. The JSON object must strictly adhere to the following structure:
       {
@@ -96,4 +97,5 @@ const suggestBetsFromHistoryFlow = ai.defineFlow(
     return output!;
   }
 );
+
 

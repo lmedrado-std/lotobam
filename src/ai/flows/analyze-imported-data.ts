@@ -41,24 +41,25 @@ const prompt = ai.definePrompt({
   Return a single, valid JSON object with a "results" key. The value of "results" must be an array of arrays, where each inner array contains the 20 numbers for one lottery contest. Do not include any text or explanations outside of the JSON object.
 
   Example Input Snippet:
-  "LOTOMANIA - CONCURSOS E RESULTADOS
+  "As Loterias - www.asloterias.com.br - Todos Resultados da Loto Mania
+  Este arquivo foi baixado no site www.asloterias.com.br no dia 09/11/2025
+  TODOS RESULTADOS DA LOTO MANIA POR ORDEM DE SORTEIO
   Concurso;Data;bola 1;bola 2;...;bola 20
-  2846;07/11/2025;42;33;...;12
-  2845;05/11/2025;53;69;...;88
-
+  2846;07/11/202;42;33;...;39
+  2845;05/11/202;53;69;...;16
   "
 
-  Example of a valid row to parse:
-  "2845;05/11/2025;53;69;01;02;03;04;05;06;07;08;09;10;11;12;13;14;15;16;17;88"
+  Example of a valid row to parse from the snippet:
+  "2846;07/11/202;42;33;25;97;68;13;12;76;92;16;73;74;28;67;60;41;93;14;53;39"
 
-  Correctly Extracted Numbers from that row:
-  [53, 69, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 88]
+  Correctly Extracted Numbers from that row (the 20 numbers after the date):
+  [42, 33, 25, 97, 68, 13, 12, 76, 92, 16, 73, 74, 28, 67, 60, 41, 93, 14, 53, 39]
 
   Example Final JSON Output:
   {
     "results": [
-      [42, 33, ...],
-      [53, 69, ...]
+      [42, 33, 25, 97, 68, 13, 12, 76, 92, 16, 73, 74, 28, 67, 60, 41, 93, 14, 53, 39],
+      [53, 69, 86, 44, 39, 75, 30, 81, 90, 73, 96, 31, 58, 37, 54, 21, 85, 83, 68, 16]
     ]
   }
 
@@ -82,5 +83,6 @@ const analyzeImportedDataFlow = ai.defineFlow(
     return output!;
   }
 );
+
 
 

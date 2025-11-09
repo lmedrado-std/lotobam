@@ -39,9 +39,24 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Download, Sparkles, Trash2 } from 'lucide-react';
+import { Bookmark, Download, Sparkles, Trash2, FileText, FileJson, FileCsv } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 
 const formSchema = z.object({
   mode: z.string({
@@ -61,6 +76,12 @@ const formSchema = z.object({
   message: 'Por favor, insira os números que deseja fixar.',
   path: ['manualNumbers'],
 });
+
+const templateFormSchema = z.object({
+  name: z.string().min(3, { message: 'O nome do modelo deve ter pelo menos 3 caracteres.' }),
+  description: z.string().optional(),
+});
+
 
 type Bet = number[];
 
@@ -90,6 +111,7 @@ function generateBet(mode: string, manualNumbers: Set<number>): Bet {
 export default function GeneratePage() {
   const [generatedBets, setGeneratedBets] = useState<Bet[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaveTemplateModalOpen, setSaveTemplateModalOpen] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -99,6 +121,14 @@ export default function GeneratePage() {
       mode: 'aleatorio',
       manualNumbers: '',
     },
+  });
+  
+  const templateForm = useForm<z.infer<typeof templateFormSchema>>({
+    resolver: zodResolver(templateFormSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+    }
   });
 
   const selectedMode = useWatch({
@@ -134,6 +164,33 @@ export default function GeneratePage() {
 
   function handleClear() {
     setGeneratedBets([]);
+  }
+
+  function handleExport(format: 'csv' | 'json' | 'txt') {
+    // Mock export logic
+    toast({
+      title: 'Exportação iniciada',
+      description: `Seu arquivo no formato ${format.toUpperCase()} está sendo preparado.`,
+    });
+    console.log(`Exporting ${generatedBets.length} bets in ${format} format.`);
+  }
+
+  function handleSaveTemplate(values: z.infer<typeof templateFormSchema>) {
+    const generationCriteria = form.getValues();
+    
+    // Mock save logic. We will connect to Firestore later.
+    console.log('Saving template:', {
+      templateDetails: values,
+      generationCriteria,
+    });
+    
+    toast({
+      title: 'Modelo salvo!',
+      description: `O modelo "${values.name}" foi salvo com sucesso.`,
+    });
+
+    setSaveTemplateModalOpen(false);
+    templateForm.reset();
   }
 
   return (
@@ -252,8 +309,28 @@ export default function GeneratePage() {
                 </CardDescription>
                </div>
                <div className="flex gap-2">
-                 <Button variant="outline"><Bookmark className="mr-2 h-4 w-4"/> Salvar como Modelo</Button>
-                 <Button><Download className="mr-2 h-4 w-4"/> Exportar</Button>
+                 <Button variant="outline" onClick={() => setSaveTemplateModalOpen(true)}>
+                   <Bookmark className="mr-2 h-4 w-4"/> Salvar como Modelo
+                 </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button><Download className="mr-2 h-4 w-4"/> Exportar</Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleExport('csv')}>
+                        <FileCsv className="mr-2 h-4 w-4" />
+                        <span>CSV</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport('txt')}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        <span>TXT</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport('json')}>
+                        <FileJson className="mr-2 h-4 w-4" />
+                        <span>JSON</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                  <Button variant="ghost" size="icon" onClick={handleClear}><Trash2 className="h-4 w-4"/></Button>
                </div>
              </div>
@@ -292,6 +369,58 @@ export default function GeneratePage() {
            </CardContent>
          </Card>
        )}
+
+      {/* Save Template Modal */}
+      <Dialog open={isSaveTemplateModalOpen} onOpenChange={setSaveTemplateModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Salvar Modelo de Geração</DialogTitle>
+            <DialogDescription>
+              Dê um nome e uma descrição para reutilizar essa configuração de critérios mais tarde.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...templateForm}>
+            <form 
+              onSubmit={templateForm.handleSubmit(handleSaveTemplate)} 
+              className="space-y-4 py-4"
+            >
+              <FormField
+                control={templateForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome do Modelo</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Balanceado com números da sorte" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={templateForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Descrição (Opcional)</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Ex: Modelo para bolões em família" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Cancelar</Button>
+                </DialogClose>
+                <Button type="submit">Salvar Modelo</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+

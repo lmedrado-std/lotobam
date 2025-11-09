@@ -227,7 +227,7 @@ export default function GeneratePage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       quantity: 10,
-      dataSource: 'padrao',
+      dataSource: 'arquivo',
       generationMode: 'aleatorio',
       manualNumbers: '',
       aiStrategy: 'balanced',
@@ -394,7 +394,7 @@ export default function GeneratePage() {
     }
     
     const fileContent = formatBets(generatedBets, 'csv');
-    downloadFile(fileContent, `lotomania-apostas-${Date.now()}.csv`, 'text/csv;charset=utf-8;');
+    downloadFile(fileContent, `lotomania-apostas.csv`, 'text/csv;charset=utf-8;');
 
     toast({
       title: 'Exportação Concluída',
@@ -537,9 +537,9 @@ export default function GeneratePage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="padrao">Padrão (Simples)</SelectItem>
-                        <SelectItem value="historico">Histórico de Concursos (IA)</SelectItem>
                         <SelectItem value="arquivo">Arquivo Local (IA)</SelectItem>
+                        <SelectItem value="historico">Histórico de Concursos (IA)</SelectItem>
+                        <SelectItem value="padrao">Padrão (Simples)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
@@ -729,7 +729,7 @@ export default function GeneratePage() {
                    <Bookmark className="mr-2 h-4 w-4"/> Salvar como Modelo
                  </Button>
                   <Button onClick={handleExport}>
-                    <FileSpreadsheet className="mr-2 h-4 w-4"/> Exportar para Excel (CSV)
+                    <FileSpreadsheet className="mr-2 h-4 w-4"/> Exportar para Excel
                   </Button>
                  <Button variant="ghost" size="icon" onClick={handleClear} title="Limpar apostas geradas">
                    <Trash2 className="h-4 w-4"/>
@@ -821,3 +821,4 @@ export default function GeneratePage() {
     
 
     
+

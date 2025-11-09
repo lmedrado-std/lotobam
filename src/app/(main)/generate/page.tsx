@@ -57,22 +57,24 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import sampleData from '@/lib/sample-results.json';
 import { suggestBetsFromHistory, type SuggestBetsFromHistoryOutput } from '@/ai/flows/suggest-bets-from-history';
+import { analyzeImportedData } from '@/ai/flows/analyze-imported-data';
 import { cn } from '@/lib/utils';
 
 
 const formSchema = z.object({
-  mode: z.string({
-    required_error: 'Por favor, selecione um modo de geração.',
+  dataSource: z.string({
+    required_error: 'Por favor, selecione uma fonte de dados.',
   }),
+  generationMode: z.string().optional(),
   quantity: z.coerce
     .number()
     .min(1, { message: 'A quantidade deve ser no mínimo 1.' })
     .max(100, { message: 'A quantidade não pode ser maior que 100.' }),
   manualNumbers: z.string().optional(),
   aiStrategy: z.string().optional(),
-  avoidanceBase: z.string().optional(),
+  numbersToAvoid: z.string().optional(),
 }).refine(data => {
-  if (data.mode === 'completar_manual' || data.mode === 'excluir_numeros') {
+  if (data.dataSource === 'padrao' && (data.generationMode === 'completar_manual' || data.generationMode === 'excluir_numeros')) {
     return !!data.manualNumbers && data.manualNumbers.trim() !== '';
   }
   return true;
@@ -84,11 +86,6 @@ const formSchema = z.object({
 const templateFormSchema = z.object({
   name: z.string().min(3, { message: 'O nome do modelo deve ter pelo menos 3 caracteres.' }),
   description: z.string().optional(),
-});
-
-const fileImportSchema = z.object({
-  aiFileStrategy: z.string(),
-  avoidNumbersFile: z.string().optional(),
 });
 
 
@@ -112,12 +109,11 @@ function lottoSort(a: number, b: number): number {
 function generateBet(mode: string, exclusionSet: Set<number> = new Set()): Bet {
   let bet: Set<number> = new Set();
   
-  // Specific logic for 'completar_manual' which is handled in onSubmit
   if (mode === 'completar_manual') {
-     // This mode's primary logic is handled before calling generateBet.
-     // This function, for this mode, just fills up the remainder.
+    bet = new Set(exclusionSet); // Start with the fixed numbers
+    exclusionSet = new Set(); // Don't exclude them from the random part
   }
-
+  
   while (bet.size < 50) {
     const randomNumber = Math.floor(Math.random() * 100); // 0-99
     if (!bet.has(randomNumber) && !exclusionSet.has(randomNumber)) {
@@ -156,7 +152,7 @@ const LottoGrid = ({ bet }: { bet: Bet }) => {
       if(b === 0) return -1;
       return a - b;
   });
-  finalGrid.push(0);
+  if(!finalGrid.includes(0)) finalGrid.push(0);
 
   const betSet = new Set(bet);
 
@@ -182,28 +178,8 @@ const LottoGrid = ({ bet }: { bet: Bet }) => {
   );
 };
 
-const getNumberStats = (results: {numeros: number[]}[]) => {
-    const frequency: { [key: number]: number } = {};
-    for (let i = 0; i <= 99; i++) {
-        frequency[i] = 0;
-    }
 
-    results.forEach(result => {
-        result.numeros.forEach((num: number) => {
-            if (frequency[num] !== undefined) {
-                frequency[num]++;
-            }
-        });
-    });
-
-    const sortedNumbers = Object.entries(frequency).sort((a, b) => b[1] - a[1]);
-    const hotNumbers = sortedNumbers.slice(0, 20).map(item => parseInt(item[0]));
-    const coldNumbers = sortedNumbers.slice(-20).map(item => parseInt(item[0]));
-
-    return { hotNumbers, coldNumbers };
-};
-
-const getNumberStatsFromResultsArray = (results: number[][]) => {
+const getNumberStats = (results: number[][]) => {
     const frequency: { [key: number]: number } = {};
     for (let i = 0; i <= 99; i++) {
         frequency[i] = 0;
@@ -224,55 +200,18 @@ const getNumberStatsFromResultsArray = (results: number[][]) => {
     return { hotNumbers, coldNumbers };
 };
 
-const modeDescriptions: Record<string, string> = {
+const generationModeDescriptions: Record<string, string> = {
   aleatorio: 'Gera apostas com 50 números selecionados de forma totalmente aleatória entre 00 e 99.',
   completar_manual: 'Você fixa alguns números e o sistema completa o restante aleatoriamente até atingir 50 números.',
   excluir_numeros: 'Você informa números que não devem aparecer em nenhuma das apostas geradas.',
-  evitar_base: 'Gera apostas evitando números com base em uma fonte de dados, como o histórico de concursos ou um arquivo seu.',
-  ai_strategy: 'A IA analisa o histórico de resultados e sugere apostas com base em estratégias de números quentes, frios ou um mix de ambos.',
 };
 
-
-// Function to extract numbers from CSV/TXT content
-function extractNumbersFromFileContent(fileContent: string): number[][] {
-  const lines = fileContent.split(/\r?\n/);
-  const results: number[][] = [];
-  let headerFound = false;
-
-  for (const line of lines) {
-    const cleanedLine = line.trim();
-    if (!cleanedLine) continue;
-
-    // A simple way to detect a header: check for "Concurso" and "bola"
-    if (cleanedLine.toLowerCase().includes('concurso') && cleanedLine.toLowerCase().includes('bola')) {
-      headerFound = true;
-      continue;
-    }
-
-    // If a header was found, we can be more strict. If not, be more lenient.
-    if (headerFound) {
-       // Split by semicolon or comma
-      const parts = cleanedLine.split(/[;,]/);
-      // Heuristic: if a row has more than 20 parts, it's likely a results row
-      if (parts.length >= 20) {
-        // Assume the first two parts can be contest number and date
-        const potentialNumbers = parts.slice(2).map(p => parseInt(p.trim(), 10));
-        const numbers = potentialNumbers.filter(n => !isNaN(n) && n >= 0 && n <= 99);
-        if (numbers.length >= 20) {
-           results.push(numbers.slice(0, 20));
-        }
-      }
-    } else {
-      // Lenient parsing for files without a clear header
-      const parts = cleanedLine.split(/[;, \t]+/);
-      const numbers = parts.map(p => parseInt(p.trim(), 10)).filter(n => !isNaN(n) && n >= 0 && n <= 99);
-      if (numbers.length === 50 || numbers.length === 20) { // Common bet/result lengths
-        results.push(numbers);
-      }
-    }
-  }
-  return results;
+const dataSourceDescriptions: Record<string, string> = {
+    padrao: 'Gere apostas usando métodos simples como aleatório puro, completar ou excluir números manualmente.',
+    historico: 'A IA analisa nosso histórico de concursos para sugerir apostas com base em estratégias de números quentes, frios ou um mix.',
+    arquivo: 'Faça upload de um arquivo de resultados (CSV/TXT). A IA irá analisá-lo e gerar novas apostas com base na estratégia que você escolher.'
 }
+
 
 export default function GeneratePage() {
   const [generatedBets, setGeneratedBets] = useState<Bet[]>([]);
@@ -283,21 +222,16 @@ export default function GeneratePage() {
 
   const { toast } = useToast();
   const { firestore, user, isUserLoading } = useFirebase();
-  const [resultsHistory, setResultsHistory] = useState<any[]>([]);
-
-  useEffect(() => {
-    // Load results on component mount
-    setResultsHistory(sampleData.results);
-  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       quantity: 10,
-      mode: 'aleatorio',
+      dataSource: 'padrao',
+      generationMode: 'aleatorio',
       manualNumbers: '',
       aiStrategy: 'balanced',
-      avoidanceBase: 'historico',
+      numbersToAvoid: ''
     },
   });
   
@@ -309,118 +243,64 @@ export default function GeneratePage() {
     }
   });
 
-  const fileImportForm = useForm<z.infer<typeof fileImportSchema>>({
-    resolver: zodResolver(fileImportSchema),
-    defaultValues: {
-      aiFileStrategy: 'balanced',
-      avoidNumbersFile: '',
-    },
-  });
-
-  const selectedMode = useWatch({
+  const selectedDataSource = useWatch({
     control: form.control,
-    name: 'mode',
+    name: 'dataSource',
   });
 
-  const generateBetsWithFile = async () => {
-    if (!selectedFile) {
-        toast({
-            variant: 'destructive',
-            title: 'Nenhum arquivo selecionado',
-            description: 'Por favor, localize um arquivo para usar como base.',
+  const selectedGenerationMode = useWatch({
+      control: form.control,
+      name: 'generationMode'
+  });
+
+  const callAiSuggestBets = async (
+    stats: { hotNumbers: number[]; coldNumbers: number[] }, 
+    quantity: number, 
+    strategy: string, 
+    exclusionList: number[],
+    existingBets: Bet[] = []
+  ): Promise<Bet[]> => {
+      let allSuggestions: SuggestBetsFromHistoryOutput['suggestions'] = [];
+      let attempts = 0;
+      const maxAttempts = 5; 
+      const existingBetsSet = new Set(existingBets.map(b => JSON.stringify(b.sort(lottoSort))));
+
+      while (allSuggestions.length < quantity && attempts < maxAttempts) {
+        const needed = quantity - allSuggestions.length;
+        const response = await suggestBetsFromHistory({
+            stats,
+            strategy: strategy,
+            numberOfBets: needed,
+            manualExclusion: exclusionList,
         });
-        return;
-    }
-
-    setIsGenerating(true);
-    setGeneratedBets([]);
-
-    try {
-        const fileContent = await selectedFile.text();
         
-        toast({
-          title: 'Lendo seu arquivo...',
-          description: 'Extraindo os números para análise.',
-        });
-        
-        const existingBets = extractNumbersFromFileContent(fileContent);
-
-        if (existingBets.length === 0) {
-          throw new Error("Nenhum número de aposta ou resultado válido foi encontrado no arquivo.");
-        }
-        
-        const stats = getNumberStatsFromResultsArray(existingBets);
-
-        const { quantity } = form.getValues();
-        const { aiFileStrategy, avoidNumbersFile } = fileImportForm.getValues();
-        
-        const manualExclusionSet = parseManualNumbers(avoidNumbersFile);
-
-        toast({
-          title: 'Analisando e gerando apostas...',
-          description: `Usando a estratégia "${aiFileStrategy}" com base nos dados do arquivo.`,
-        });
-
-        let allSuggestions: SuggestBetsFromHistoryOutput['suggestions'] = [];
-        let attempts = 0;
-        const maxAttempts = 5; 
-        const existingBetsSet = new Set(existingBets.map(b => JSON.stringify(b.sort(lottoSort))));
-
-        while (allSuggestions.length < quantity && attempts < maxAttempts) {
-          const needed = quantity - allSuggestions.length;
-          const response = await suggestBetsFromHistory({
-              stats,
-              strategy: aiFileStrategy,
-              numberOfBets: needed,
-              manualExclusion: Array.from(manualExclusionSet),
-          });
-          
-          if (!response || !response.suggestions) {
-            // If the AI response is invalid, stop trying.
-            throw new Error("A IA retornou uma resposta inválida. Tente novamente.");
-          }
-
-          const newUniqueSuggestions = response.suggestions.filter(suggestion => {
-              const sortedSuggestion = [...suggestion].sort(lottoSort);
-              const suggestionKey = JSON.stringify(sortedSuggestion);
-              if (existingBetsSet.has(suggestionKey)) {
-                return false;
-              }
-              // Also check against newly generated suggestions to ensure uniqueness within the batch
-              const isDuplicateInBatch = allSuggestions.some(existing => JSON.stringify([...existing].sort(lottoSort)) === suggestionKey);
-              return !isDuplicateInBatch;
-          });
-
-          allSuggestions.push(...newUniqueSuggestions);
-          attempts++;
+        if (!response || !response.suggestions) {
+          throw new Error("A IA retornou uma resposta inválida. Tente novamente.");
         }
 
-        if (allSuggestions.length < quantity) {
-          toast({
-            variant: 'default',
-            title: 'Não foi possível gerar todos os jogos inéditos',
-            description: `A IA tentou, mas não conseguiu criar ${quantity} jogos que já não estivessem no seu arquivo. Foram gerados ${allSuggestions.length} jogos únicos.`,
-          })
-        }
+        const newUniqueSuggestions = response.suggestions.filter(suggestion => {
+            const sortedSuggestion = [...suggestion].sort(lottoSort);
+            const suggestionKey = JSON.stringify(sortedSuggestion);
+            if (existingBetsSet.has(suggestionKey)) {
+              return false;
+            }
+            const isDuplicateInBatch = allSuggestions.some(existing => JSON.stringify([...existing].sort(lottoSort)) === suggestionKey);
+            return !isDuplicateInBatch;
+        });
 
-        const finalBets = allSuggestions.slice(0, quantity).map(bet => bet.sort(lottoSort));
-        setGeneratedBets(finalBets);
-        
+        allSuggestions.push(...newUniqueSuggestions);
+        attempts++;
+      }
+
+      if (allSuggestions.length < quantity) {
         toast({
-          title: 'Apostas geradas com base no arquivo!',
-          description: `Análise concluída. ${finalBets.length} novas apostas foram criadas.`,
+          variant: 'default',
+          title: 'Não foi possível gerar todos os jogos inéditos',
+          description: `A IA tentou, mas não conseguiu criar ${quantity} jogos que já não estivessem na sua fonte de dados. Foram gerados ${allSuggestions.length} jogos únicos.`,
         })
+      }
 
-    } catch (error: any) {
-        console.error("File-based AI generation failed:", error);
-        toast({
-            variant: "destructive",
-            title: "Erro ao analisar o arquivo",
-            description: error.message || "Verifique se o arquivo está no formato correto (CSV ou TXT) ou tente novamente.",
-        });
-    } finally {
-        setIsGenerating(false);
-    }
+      return allSuggestions.slice(0, quantity).map(bet => bet.sort(lottoSort));
   };
 
 
@@ -428,100 +308,69 @@ export default function GeneratePage() {
     setIsGenerating(true);
     setGeneratedBets([]);
 
-    if (data.mode === 'ai_strategy') {
-      try {
-        toast({
-          title: 'A IA está pensando...',
-          description: 'Analisando o histórico de resultados para criar as melhores apostas.',
-        });
-        
-        const stats = getNumberStats(resultsHistory);
+    try {
+        if (data.dataSource === 'historico') {
+            toast({ title: 'A IA está pensando...', description: 'Analisando o histórico de concursos para criar as melhores apostas.' });
+            const historyResults = sampleData.results.map(r => r.numeros);
+            const stats = getNumberStats(historyResults);
+            const exclusionList = Array.from(parseManualNumbers(data.numbersToAvoid));
 
-        const response = await suggestBetsFromHistory({
-          stats,
-          strategy: data.aiStrategy || 'balanced',
-          numberOfBets: data.quantity,
-          manualExclusion: [],
-        });
-        setGeneratedBets(response.suggestions.map(bet => bet.sort(lottoSort)));
-      } catch (error) {
-        console.error("AI generation failed:", error);
-        toast({
-          variant: "destructive",
-          title: "Erro da IA",
-          description: "Não foi possível gerar apostas com a IA. Tente novamente.",
-        });
-      } finally {
-        setIsGenerating(false);
-      }
-      return;
-    }
+            const bets = await callAiSuggestBets(stats, data.quantity, data.aiStrategy || 'balanced', exclusionList);
+            setGeneratedBets(bets);
 
-    let exclusionSet = new Set<number>();
-    
-    if (data.mode === 'evitar_base') {
-      if (data.avoidanceBase === 'historico') {
-        const numbersFromHistory = resultsHistory.flatMap(result => result.numeros);
-        exclusionSet = new Set(numbersFromHistory);
-      } else if (data.avoidanceBase === 'arquivo') {
-          toast({
-            variant: "destructive",
-            title: "Use a seção de Upload",
-            description: "Para evitar números com base em um arquivo, por favor, use a seção 'Gerar com Base em Arquivo' abaixo.",
-          });
-          setIsGenerating(false);
-          return;
-      }
-    } else {
-        exclusionSet = parseManualNumbers(data.manualNumbers);
-    }
+        } else if (data.dataSource === 'arquivo') {
+            if (!selectedFile) {
+                throw new Error('Por favor, selecione um arquivo para usar como base.');
+            }
+            toast({ title: 'Lendo seu arquivo...', description: 'Extraindo os números para análise da IA.' });
+            const fileContent = await selectedFile.text();
+            
+            const analyzedData = await analyzeImportedData({ fileContent });
+            if (!analyzedData || !analyzedData.results || analyzedData.results.length === 0) {
+              throw new Error("Nenhum número de aposta ou resultado válido foi encontrado no arquivo. Verifique o formato.");
+            }
 
-    if (data.mode === 'completar_manual') {
-      if (exclusionSet.size >= 50) {
-        toast({
-          variant: "destructive",
-          title: "Muitos números inseridos",
-          description: "Você inseriu 50 ou mais números. Não é necessário completar.",
-        });
-        const singleBet = Array.from(exclusionSet).slice(0, 50).sort(lottoSort);
-        setGeneratedBets([singleBet]);
-        setIsGenerating(false);
-        return;
-      }
-      
-      const completedBets = Array.from({ length: data.quantity }, () => {
-        let bet = new Set(exclusionSet);
-        while (bet.size < 50) {
-          const randomNumber = Math.floor(Math.random() * 100);
-          if (!bet.has(randomNumber)) {
-            bet.add(randomNumber);
-          }
+            toast({ title: 'Analisando e gerando apostas...', description: `Usando a estratégia "${data.aiStrategy}" com base nos dados do arquivo.` });
+            const stats = getNumberStats(analyzedData.results);
+            const exclusionList = Array.from(parseManualNumbers(data.numbersToAvoid));
+
+            const bets = await callAiSuggestBets(stats, data.quantity, data.aiStrategy || 'balanced', exclusionList, analyzedData.results);
+            setGeneratedBets(bets);
+            if(bets.length > 0) {
+              toast({ title: 'Apostas geradas com base no arquivo!', description: `Análise concluída. ${bets.length} novas apostas foram criadas.` });
+            }
+
+        } else { // Standard Modes
+            let bets: Bet[] = [];
+            let initialSet = parseManualNumbers(data.manualNumbers);
+
+            if (data.generationMode === 'completar_manual') {
+                if (initialSet.size >= 50) {
+                    toast({ variant: "destructive", title: "Muitos números inseridos", description: "Você inseriu 50 ou mais números. Não é necessário completar." });
+                    bets = [Array.from(initialSet).slice(0, 50).sort(lottoSort)];
+                } else {
+                    bets = Array.from({ length: data.quantity }, () => generateBet('completar_manual', initialSet));
+                }
+            } else if (data.generationMode === 'excluir_numeros') {
+                if (initialSet.size > 50) {
+                    throw new Error("Você não pode excluir mais de 50 números, pois é impossível gerar uma aposta.");
+                }
+                bets = Array.from({ length: data.quantity }, () => generateBet('aleatorio', initialSet));
+            } else { // aleatorio
+                bets = Array.from({ length: data.quantity }, () => generateBet('aleatorio'));
+            }
+            setGeneratedBets(bets);
         }
-        return Array.from(bet).sort(lottoSort);
-      });
-      setGeneratedBets(completedBets);
-      setIsGenerating(false);
-      return;
+    } catch (error: any) {
+        console.error("Bet generation failed:", error);
+        toast({
+            variant: "destructive",
+            title: "Erro ao Gerar Apostas",
+            description: error.message || "Ocorreu um erro inesperado. Tente novamente.",
+        });
+    } finally {
+        setIsGenerating(false);
     }
-    
-    if ((data.mode === 'excluir_numeros' || data.mode === 'evitar_base') && exclusionSet.size > 50) {
-      toast({
-        variant: "destructive",
-        title: "Muitos números para excluir",
-        description: "Você não pode excluir mais de 50 números, pois é impossível gerar uma aposta.",
-      });
-      setIsGenerating(false);
-      return;
-    }
-
-    // Simulating generation delay for non-AI modes
-    setTimeout(() => {
-      const modeForGeneration = (data.mode === 'completar_manual') ? 'aleatorio' : data.mode;
-      const finalExclusionSet = (data.mode === 'excluir_numeros' || data.mode === 'evitar_base') ? exclusionSet : new Set();
-      const bets = Array.from({ length: data.quantity }, () => generateBet(modeForGeneration, finalExclusionSet));
-      setGeneratedBets(bets);
-      setIsGenerating(false);
-    }, 500);
   }
 
   function handleClear() {
@@ -543,7 +392,7 @@ export default function GeneratePage() {
 
     toast({
       title: 'Exportação Concluída',
-      description: `Seu arquivo .csv foi baixado. Você pode abri-lo com o Excel.`,
+      description: `Seu arquivo .csv foi baixado.`,
     });
   }
 
@@ -623,7 +472,7 @@ export default function GeneratePage() {
   };
 
   const getManualNumbersLabel = () => {
-    switch (selectedMode) {
+    switch (selectedGenerationMode) {
       case 'completar_manual':
         return 'Números para Fixar';
       case 'excluir_numeros':
@@ -634,7 +483,7 @@ export default function GeneratePage() {
   };
 
   const getManualNumbersDescription = () => {
-    switch (selectedMode) {
+    switch (selectedGenerationMode) {
       case 'completar_manual':
         return 'O sistema usará esses números e gerará o restante aleatoriamente até completar 50.';
       case 'excluir_numeros':
@@ -660,40 +509,38 @@ export default function GeneratePage() {
         <CardHeader>
           <CardTitle>Critérios de Geração</CardTitle>
           <CardDescription>
-            Escolha como suas apostas serão geradas para obter diferentes resultados e estratégias.
+            Defina a fonte de dados e os critérios para criar suas apostas.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form
               onSubmit={form.handleSubmit(onSubmit)}
-              className="grid grid-cols-1 gap-6 md:grid-cols-3"
+              className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"
             >
               <FormField
                 control={form.control}
-                name="mode"
+                name="dataSource"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Modo de Geração</FormLabel>
+                    <FormLabel>Fonte de Dados</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecione um modo" />
+                          <SelectValue placeholder="Selecione uma fonte" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="aleatorio">Aleatório Puro</SelectItem>
-                        <SelectItem value="completar_manual">Completar Números</SelectItem>
-                        <SelectItem value="excluir_numeros">Excluir Números (Manual)</SelectItem>
-                        <SelectItem value="evitar_base">Evitar Números da Base</SelectItem>
-                        <SelectItem value="ai_strategy">Inteligência Artificial (Beta)</SelectItem>
+                        <SelectItem value="padrao">Padrão (Simples)</SelectItem>
+                        <SelectItem value="historico">Histórico de Concursos (IA)</SelectItem>
+                        <SelectItem value="arquivo">Arquivo Local (IA)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      {modeDescriptions[selectedMode] || 'Selecione um modo para ver a descrição.'}
+                       {dataSourceDescriptions[selectedDataSource] || 'Escolha como suas apostas serão geradas.'}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -717,107 +564,45 @@ export default function GeneratePage() {
                 )}
               />
 
-              <div className="md:flex md:items-end md:justify-end md:col-start-3">
+              <div className="md:col-start-3 md:flex md:items-end md:justify-end">
                 <Button type="submit" disabled={isGenerating} className="w-full md:w-auto">
                   <Sparkles className="mr-2 h-4 w-4" />
                   {isGenerating ? 'Gerando...' : 'Gerar Apostas'}
                 </Button>
               </div>
-              
-              {selectedMode === 'evitar_base' && (
-                 <div className="md:col-span-3">
-                  <FormField
-                    control={form.control}
-                    name="avoidanceBase"
-                    render={({ field }) => (
-                      <FormItem className="space-y-3">
-                        <FormLabel>Base de Números para Evitar</FormLabel>
-                        <FormControl>
-                          <RadioGroup
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                            className="flex flex-col space-y-1"
-                          >
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value="historico" />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                Todo o histórico de resultados
-                              </FormLabel>
-                            </FormItem>
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value="arquivo" />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                Números de um arquivo importado
-                              </FormLabel>
-                            </FormItem>
-                          </RadioGroup>
-                        </FormControl>
-                        <FormDescription>
-                          A geração irá evitar todos os números únicos presentes na base escolhida.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
 
-              {selectedMode === 'ai_strategy' && (
-                <div className="md:col-span-3">
-                  <FormField
-                    control={form.control}
-                    name="aiStrategy"
-                    render={({ field }) => (
-                      <FormItem className="space-y-3">
-                        <FormLabel>Estratégia da IA (Base: Histórico de Concursos)</FormLabel>
-                        <FormControl>
-                          <RadioGroup
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                            className="flex flex-col space-y-1"
-                          >
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value="hot" />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                Números Quentes (Mais Frequentes)
-                              </FormLabel>
-                            </FormItem>
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value="cold" />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                Números Frios (Menos Frequentes)
-                              </FormLabel>
-                            </FormItem>
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value="balanced" />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                Balanceado (Mix de Quentes e Frios)
-                              </FormLabel>
-                            </FormItem>
-                          </RadioGroup>
-                        </FormControl>
-                        <FormDescription>
-                          A IA usará o histórico de resultados para seguir a estratégia escolhida.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
-
-              {(selectedMode === 'completar_manual' || selectedMode === 'excluir_numeros') && (
+              {/* Standard Generation Mode */}
+              {selectedDataSource === 'padrao' && (
                 <FormField
+                  control={form.control}
+                  name="generationMode"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-3">
+                      <FormLabel>Modo de Geração</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione um modo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="aleatorio">Aleatório Puro</SelectItem>
+                          <SelectItem value="completar_manual">Completar Números</SelectItem>
+                          <SelectItem value="excluir_numeros">Excluir Números</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        {generationModeDescriptions[selectedGenerationMode || ''] || 'Selecione um modo para ver a descrição.'}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              
+              {/* Manual numbers for standard modes */}
+              {selectedDataSource === 'padrao' && (selectedGenerationMode === 'completar_manual' || selectedGenerationMode === 'excluir_numeros') && (
+                 <FormField
                   control={form.control}
                   name="manualNumbers"
                   render={({ field }) => (
@@ -837,47 +622,15 @@ export default function GeneratePage() {
                   )}
                 />
               )}
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Gerar com Base em Arquivo</CardTitle>
-          <CardDescription>Faça upload de um arquivo de resultados (como a planilha que você baixou) ou um arquivo com suas próprias apostas. A IA irá analisá-lo e gerar novas apostas com base na estratégia que você escolher.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-4 sm:flex-row">
-            <Input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              className="hidden"
-              accept=".csv, .txt, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-            />
-            <Button variant="outline" onClick={handleUploadClick} className="w-full sm:w-auto">
-              <Upload className="mr-2 h-4 w-4" />
-              Localizar Arquivo
-            </Button>
-            {selectedFile && (
-              <div className="flex items-center rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
-                Arquivo: <span className="ml-2 font-medium text-foreground">{selectedFile.name}</span>
-              </div>
-            )}
-          </div>
-          {selectedFile && (
-            <Form {...fileImportForm}>
-              <form onSubmit={(e) => { e.preventDefault(); generateBetsWithFile(); }} className="space-y-6">
-                 <FormField
-                  control={fileImportForm.control}
-                  name="aiFileStrategy"
+
+              {/* AI Strategy */}
+              {(selectedDataSource === 'historico' || selectedDataSource === 'arquivo') && (
+                <FormField
+                  control={form.control}
+                  name="aiStrategy"
                   render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel>Estratégia da IA (Base: Arquivo)</FormLabel>
-                       <FormDescription>
-                        A IA irá analisar as estatísticas do seu arquivo para gerar as apostas e garantirá que os jogos gerados sejam diferentes dos que já existem no arquivo.
-                      </FormDescription>
+                    <FormItem className="space-y-3 md:col-span-3">
+                      <FormLabel>Estratégia da IA</FormLabel>
                       <FormControl>
                         <RadioGroup
                           onValueChange={field.onChange}
@@ -885,42 +638,60 @@ export default function GeneratePage() {
                           className="flex flex-col space-y-1"
                         >
                           <FormItem className="flex items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="hot" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              Usar Números Quentes do arquivo (mais frequentes)
-                            </FormLabel>
+                            <FormControl><RadioGroupItem value="hot" /></FormControl>
+                            <FormLabel className="font-normal">Números Quentes (Mais Frequentes)</FormLabel>
                           </FormItem>
                           <FormItem className="flex items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="cold" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              Usar Números Frios do arquivo (menos frequentes)
-                            </FormLabel>
+                            <FormControl><RadioGroupItem value="cold" /></FormControl>
+                            <FormLabel className="font-normal">Números Frios (Menos Frequentes)</FormLabel>
                           </FormItem>
                           <FormItem className="flex items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="balanced" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              Balancear (mix de quentes, frios e outros)
-                            </FormLabel>
+                            <FormControl><RadioGroupItem value="balanced" /></FormControl>
+                            <FormLabel className="font-normal">Balanceado (Mix de Estratégias)</FormLabel>
                           </FormItem>
                         </RadioGroup>
                       </FormControl>
-                     
+                      <FormDescription>
+                        A IA usará a fonte de dados escolhida para seguir a estratégia.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+              )}
 
-                <FormField
-                  control={fileImportForm.control}
-                  name="avoidNumbersFile"
+              {/* File Upload */}
+              {selectedDataSource === 'arquivo' && (
+                <div className="space-y-4 md:col-span-3">
+                    <FormLabel>Arquivo de Origem</FormLabel>
+                    <div className="flex flex-col gap-4 sm:flex-row">
+                        <Input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleFileChange}
+                          className="hidden"
+                          accept=".csv, .txt"
+                        />
+                        <Button variant="outline" onClick={handleUploadClick} className="w-full sm:w-auto">
+                          <Upload className="mr-2 h-4 w-4" />
+                          Localizar Arquivo
+                        </Button>
+                        {selectedFile && (
+                          <div className="flex items-center rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
+                            Arquivo: <span className="ml-2 font-medium text-foreground">{selectedFile.name}</span>
+                          </div>
+                        )}
+                      </div>
+                </div>
+              )}
+              
+              {/* Numbers to Avoid (for AI) */}
+              {(selectedDataSource === 'historico' || selectedDataSource === 'arquivo') && (
+                 <FormField
+                  control={form.control}
+                  name="numbersToAvoid"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="md:col-span-3">
                       <FormLabel>Números para Evitar (Opcional)</FormLabel>
                       <FormControl>
                         <Textarea
@@ -929,23 +700,19 @@ export default function GeneratePage() {
                         />
                       </FormControl>
                       <FormDescription>
-                        A IA não usará esses números ao gerar as apostas, mesmo que sejam estatisticamente relevantes no arquivo.
+                        A IA não usará esses números ao gerar as apostas, mesmo que sejam estatisticamente relevantes na fonte de dados.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+              )}
 
-                <Button type="submit" disabled={isGenerating}>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    {isGenerating ? 'Analisando...' : 'Analisar Arquivo e Gerar com IA'}
-                </Button>
-              </form>
-            </Form>
-          )}
+            </form>
+          </Form>
         </CardContent>
       </Card>
-
+      
       {generatedBets.length > 0 && (
          <Card>
            <CardHeader>
@@ -971,13 +738,12 @@ export default function GeneratePage() {
              </div>
            </CardHeader>
            <CardContent>
-             <div className="relative max-h-96 overflow-auto">
+             <div className="relative max-h-[600px] overflow-auto">
               <Table>
                 <TableHeader className="sticky top-0 bg-card">
                   <TableRow>
                     <TableHead className="w-[80px]">Aposta</TableHead>
                     <TableHead>Números</TableHead>
-  
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1050,3 +816,5 @@ export default function GeneratePage() {
   );
 }
 
+
+    

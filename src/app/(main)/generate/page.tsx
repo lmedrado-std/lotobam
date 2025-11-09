@@ -233,7 +233,7 @@ const generationModeDescriptions: Record<string, string> = {
 const dataSourceDescriptions: Record<string, string> = {
     padrao: 'Gere apostas usando métodos simples como aleatório puro, completar ou excluir números manualmente.',
     historico: 'A IA analisa nosso histórico de concursos para sugerir apostas com base em estratégias de números quentes, frios ou um mix.',
-    arquivo: 'Faça upload de um arquivo de resultados (CSV/TXT/XLSX). A IA irá analisá-lo e gerar novas apostas com base na estratégia que você escolher.'
+    arquivo: 'Faça upload de um arquivo de resultados.'
 }
 
 
@@ -917,5 +917,7 @@ export default function GeneratePage() {
 
 
 
+
+    
 
     

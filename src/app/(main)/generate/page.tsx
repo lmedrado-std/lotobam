@@ -64,6 +64,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import sampleData from '@/lib/sample-results.json';
 import { suggestBetsFromHistory } from '@/ai/flows/suggest-bets-from-history';
 import { analyzeImportedData } from '@/ai/flows/analyze-imported-data';
+import { cn } from '@/lib/utils';
 
 
 const formSchema = z.object({
@@ -158,6 +159,39 @@ const downloadFile = (content: string, fileName: string, contentType: string) =>
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+};
+
+const LottoGrid = ({ bet }: { bet: Bet }) => {
+  const numbersGrid = Array.from({ length: 10 }, (_, rowIndex) =>
+    Array.from({ length: 10 }, (_, colIndex) => {
+      let num = rowIndex * 10 + colIndex + 1;
+      if (num === 100) num = 0;
+      return num;
+    })
+  );
+
+  const betSet = new Set(bet);
+
+  return (
+    <div className="grid grid-cols-10 gap-1 p-2 rounded-md border bg-card-foreground/5 max-w-sm">
+      {numbersGrid.flat().map((num) => {
+        const isSelected = betSet.has(num);
+        return (
+          <div
+            key={num}
+            className={cn(
+              'flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium transition-colors',
+              isSelected
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary/50 text-muted-foreground'
+            )}
+          >
+            {num.toString().padStart(2, '0')}
+          </div>
+        );
+      })}
+    </div>
+  );
 };
 
 
@@ -764,19 +798,9 @@ export default function GeneratePage() {
                 <TableBody>
                   {generatedBets.map((bet, index) => (
                     <TableRow key={index}>
-                      <TableCell className="font-medium">#{index + 1}</TableCell>
+                      <TableCell className="font-medium align-top">#{index + 1}</TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {bet.map((num) => (
-                            <Badge
-                              key={num}
-                              variant="secondary"
-                              className="flex h-7 w-7 items-center justify-center text-xs"
-                            >
-                              {num.toString().padStart(2, '0')}
-                            </Badge>
-                          ))}
-                        </div>
+                        <LottoGrid bet={bet} />
                       </TableCell>
                     </TableRow>
                   ))}

@@ -63,6 +63,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import sampleData from '@/lib/sample-results.json';
 import { suggestBetsFromHistory } from '@/ai/flows/suggest-bets-from-history';
+import { analyzeImportedData } from '@/ai/flows/analyze-imported-data';
 
 
 const formSchema = z.object({
@@ -75,6 +76,7 @@ const formSchema = z.object({
     .max(100, { message: 'A quantidade não pode ser maior que 100.' }),
   manualNumbers: z.string().optional(),
   aiStrategy: z.string().optional(),
+  avoidanceBase: z.string().optional(),
 }).refine(data => {
   if (data.mode === 'completar_manual' || data.mode === 'excluir_numeros') {
     return !!data.manualNumbers && data.manualNumbers.trim() !== '';
@@ -100,20 +102,14 @@ function parseManualNumbers(numbersStr: string | undefined): Set<number> {
   return new Set(validNumbers);
 }
 
-function generateBet(mode: string, manualNumbers: Set<number>): Bet {
-  let bet: Set<number>;
-
+function generateBet(mode: string, exclusionSet: Set<number> = new Set()): Bet {
+  let bet: Set<number> = new Set();
+  
+  // Specific logic for 'completar_manual' which is handled in onSubmit
   if (mode === 'completar_manual') {
-    bet = new Set(manualNumbers);
-  } else {
-    bet = new Set();
+     // This mode's primary logic is handled before calling generateBet.
+     // This function, for this mode, just fills up the remainder.
   }
-  
-  if (bet.size >= 50) {
-    return Array.from(bet).slice(0, 50).sort((a, b) => a - b);
-  }
-  
-  const exclusionSet = mode === 'excluir_numeros' ? manualNumbers : new Set();
 
   while (bet.size < 50) {
     const randomNumber = Math.floor(Math.random() * 100);
@@ -123,6 +119,7 @@ function generateBet(mode: string, manualNumbers: Set<number>): Bet {
   }
   return Array.from(bet).sort((a, b) => a - b);
 }
+
 
 // Helper to format bets into a string
 const formatBets = (bets: Bet[], format: 'csv' | 'json' | 'txt'): string => {
@@ -179,6 +176,7 @@ export default function GeneratePage() {
       mode: 'aleatorio',
       manualNumbers: '',
       aiStrategy: 'balanced',
+      avoidanceBase: 'historico',
     },
   });
   
@@ -194,6 +192,51 @@ export default function GeneratePage() {
     control: form.control,
     name: 'mode',
   });
+
+  const generateBetsWithFile = async () => {
+    if (!selectedFile) {
+        toast({
+            variant: 'destructive',
+            title: 'Nenhum arquivo selecionado',
+            description: 'Por favor, localize um arquivo para usar como base.',
+        });
+        return;
+    }
+
+    setIsGenerating(true);
+    setGeneratedBets([]);
+
+    try {
+        const fileContent = await selectedFile.text();
+        const { quantity } = form.getValues();
+
+        toast({
+          title: 'A IA está analisando seu arquivo...',
+          description: 'Isso pode levar alguns segundos.',
+        });
+
+        const response = await analyzeImportedData({
+            data: fileContent,
+            numberOfBets: quantity,
+        });
+
+        setGeneratedBets(response.suggestions);
+        toast({
+          title: 'Apostas geradas com base no arquivo!',
+          description: response.analysis,
+        })
+    } catch (error) {
+        console.error("File-based AI generation failed:", error);
+        toast({
+            variant: "destructive",
+            title: "Erro ao ler arquivo ou gerar apostas",
+            description: "Verifique o formato do arquivo ou tente novamente.",
+        });
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+
 
   async function onSubmit(data: z.infer<typeof formSchema>) {
     setIsGenerating(true);
@@ -224,22 +267,68 @@ export default function GeneratePage() {
       return;
     }
 
+    let exclusionSet = new Set<number>();
+    
+    if (data.mode === 'evitar_base') {
+      if (data.avoidanceBase === 'historico') {
+        const numbersFromHistory = resultsHistory.flatMap(result => result.numeros);
+        exclusionSet = new Set(numbersFromHistory);
+      } else if (data.avoidanceBase === 'arquivo') {
+        if (!selectedFile) {
+          toast({
+            variant: "destructive",
+            title: "Nenhum arquivo selecionado",
+            description: "Por favor, selecione um arquivo para usar como base de exclusão.",
+          });
+          setIsGenerating(false);
+          return;
+        }
+        try {
+          const fileContent = await selectedFile.text();
+          exclusionSet = parseManualNumbers(fileContent);
+        } catch (e) {
+          toast({
+            variant: "destructive",
+            title: "Erro ao ler o arquivo",
+            description: "Não foi possível processar os números do arquivo.",
+          });
+          setIsGenerating(false);
+          return;
+        }
+      }
+    } else {
+        exclusionSet = parseManualNumbers(data.manualNumbers);
+    }
 
-    const manualNumbersSet = parseManualNumbers(data.manualNumbers);
-
-    if (data.mode === 'completar_manual' && manualNumbersSet.size >= 50) {
-      toast({
-        variant: "destructive",
-        title: "Muitos números inseridos",
-        description: "Você inseriu 50 ou mais números. Não é necessário completar.",
+    if (data.mode === 'completar_manual') {
+      if (exclusionSet.size >= 50) {
+        toast({
+          variant: "destructive",
+          title: "Muitos números inseridos",
+          description: "Você inseriu 50 ou mais números. Não é necessário completar.",
+        });
+        const singleBet = Array.from(exclusionSet).slice(0, 50).sort((a, b) => a - b);
+        setGeneratedBets([singleBet]);
+        setIsGenerating(false);
+        return;
+      }
+      
+      const completedBets = Array.from({ length: data.quantity }, () => {
+        let bet = new Set(exclusionSet);
+        while (bet.size < 50) {
+          const randomNumber = Math.floor(Math.random() * 100);
+          if (!bet.has(randomNumber)) {
+            bet.add(randomNumber);
+          }
+        }
+        return Array.from(bet).sort((a,b) => a-b);
       });
-      const singleBet = Array.from(manualNumbersSet).slice(0, 50).sort((a,b) => a - b);
-      setGeneratedBets([singleBet]);
+      setGeneratedBets(completedBets);
       setIsGenerating(false);
       return;
     }
     
-    if (data.mode === 'excluir_numeros' && manualNumbersSet.size > 50) {
+    if ((data.mode === 'excluir_numeros' || data.mode === 'evitar_base') && exclusionSet.size > 50) {
       toast({
         variant: "destructive",
         title: "Muitos números para excluir",
@@ -251,7 +340,9 @@ export default function GeneratePage() {
 
     // Simulating generation delay for non-AI modes
     setTimeout(() => {
-      const bets = Array.from({ length: data.quantity }, () => generateBet(data.mode, manualNumbersSet));
+      const modeForGeneration = (data.mode === 'completar_manual') ? 'aleatorio' : data.mode;
+      const finalExclusionSet = (data.mode === 'excluir_numeros' || data.mode === 'evitar_base') ? exclusionSet : new Set();
+      const bets = Array.from({ length: data.quantity }, () => generateBet(modeForGeneration, finalExclusionSet));
       setGeneratedBets(bets);
       setIsGenerating(false);
     }, 500);
@@ -424,7 +515,8 @@ export default function GeneratePage() {
                       <SelectContent>
                         <SelectItem value="aleatorio">Aleatório Puro</SelectItem>
                         <SelectItem value="completar_manual">Completar Números</SelectItem>
-                        <SelectItem value="excluir_numeros">Excluir Números</SelectItem>
+                        <SelectItem value="excluir_numeros">Excluir Números (Manual)</SelectItem>
+                        <SelectItem value="evitar_base">Evitar Números da Base</SelectItem>
                         <SelectItem value="ai_strategy">Inteligência Artificial (Beta)</SelectItem>
                       </SelectContent>
                     </Select>
@@ -459,6 +551,48 @@ export default function GeneratePage() {
                   {isGenerating ? 'Gerando...' : 'Gerar Apostas'}
                 </Button>
               </div>
+              
+              {selectedMode === 'evitar_base' && (
+                 <div className="md:col-span-3">
+                  <FormField
+                    control={form.control}
+                    name="avoidanceBase"
+                    render={({ field }) => (
+                      <FormItem className="space-y-3">
+                        <FormLabel>Base de Números para Evitar</FormLabel>
+                        <FormControl>
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            className="flex flex-col space-y-1"
+                          >
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <RadioGroupItem value="historico" />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                Todo o histórico de resultados
+                              </FormLabel>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <RadioGroupItem value="arquivo" />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                Números de um arquivo importado
+                              </FormLabel>
+                            </FormItem>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormDescription>
+                          A geração irá evitar todos os números únicos presentes na base escolhida.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
 
               {selectedMode === 'ai_strategy' && (
                 <div className="md:col-span-3">
@@ -539,7 +673,7 @@ export default function GeneratePage() {
       <Card>
         <CardHeader>
           <CardTitle>Importar Arquivo</CardTitle>
-          <CardDescription>Faça upload de um arquivo .txt ou .csv para usar como base para a geração.</CardDescription>
+          <CardDescription>Faça upload de um arquivo .txt ou .csv para usar como base para a geração ou para evitar números.</CardDescription>
         </CardHeader>
         <CardContent>
           <Input
@@ -547,7 +681,7 @@ export default function GeneratePage() {
             ref={fileInputRef}
             onChange={handleFileChange}
             className="hidden"
-            accept=".csv, .txt"
+            accept=".csv, .txt, .json"
           />
           <Button variant="outline" onClick={handleUploadClick}>
             <Upload className="mr-2 h-4 w-4" />
@@ -561,9 +695,9 @@ export default function GeneratePage() {
         </CardContent>
         {selectedFile && (
             <CardFooter>
-                <Button>
+                <Button onClick={generateBetsWithFile} disabled={isGenerating}>
                     <Sparkles className="mr-2 h-4 w-4" />
-                    Gerar com Base no Arquivo
+                    {isGenerating ? 'Analisando...' : 'Analisar e Gerar com IA'}
                 </Button>
             </CardFooter>
         )}
@@ -695,5 +829,7 @@ export default function GeneratePage() {
     </div>
   );
 }
+
+    
 
     

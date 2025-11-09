@@ -34,7 +34,7 @@ const prompt = ai.definePrompt({
   output: { schema: AnalyzeImportedDataOutputSchema },
   prompt: `You are a data extraction expert. Your task is to parse the provided text content, which comes from a lottery results file (CSV or TXT format).
 
-  The file may contain header rows, titles, or empty lines that should be completely ignored. The relevant data rows are the ones that contain the lottery numbers. Trim any leading/trailing whitespace from the file content before processing.
+  The file may contain header rows, titles, or empty lines that should be completely ignored. Process the file line by line. The relevant data rows are the ones that contain the lottery numbers. Trim any leading/trailing whitespace from the file content before processing.
 
   For each valid row containing lottery numbers, you must extract all 20 drawn numbers (from "bola 1" to "bola 20"). Ignore all other columns like "Concurso" and "Data".
 
@@ -83,6 +83,7 @@ const analyzeImportedDataFlow = ai.defineFlow(
     return output!;
   }
 );
+
 
 
 

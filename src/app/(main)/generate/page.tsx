@@ -736,7 +736,10 @@ export default function GeneratePage() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                 <Button variant="ghost" size="icon" onClick={handleClear}><Trash2 className="h-4 w-4"/></Button>
+                 <Button variant="ghost" size="icon" onClick={handleClear} title="Limpar apostas geradas">
+                   <Trash2 className="h-4 w-4"/>
+                   <span className="sr-only">Limpar</span>
+                 </Button>
                </div>
              </div>
            </CardHeader>
@@ -829,7 +832,3 @@ export default function GeneratePage() {
     </div>
   );
 }
-
-    
-
-    

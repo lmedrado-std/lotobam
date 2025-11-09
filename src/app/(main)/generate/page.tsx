@@ -164,21 +164,33 @@ const downloadFile = (content: string, fileName: string, contentType: string) =>
 const LottoGrid = ({ bet }: { bet: Bet }) => {
   const numbersGrid = Array.from({ length: 10 }, (_, rowIndex) =>
     Array.from({ length: 10 }, (_, colIndex) => {
-      let num = rowIndex * 10 + colIndex + 1;
-      if (num === 100) num = 0;
-      return num;
+      let num = rowIndex * 10 + colIndex;
+      if(rowIndex === 0 && colIndex === 0) num = 0
+      else if (colIndex === 0) num = (rowIndex * 10)
+      
+      const n = rowIndex * 10 + colIndex + 1;
+      if (n > 100) return 0;
+      if (n === 100) return 0;
+      return n;
     })
   );
+
+  const finalGrid = Array.from({ length: 100 }, (_, i) => i).sort((a,b) => {
+      if(a === 0) return 1;
+      if(b === 0) return -1;
+      return a - b;
+  });
+  finalGrid.push(0);
 
   const betSet = new Set(bet);
 
   return (
     <div className="grid grid-cols-10 gap-1 p-2 rounded-md border bg-card-foreground/5 max-w-sm">
-      {numbersGrid.flat().map((num) => {
+      {finalGrid.slice(0,100).map((num, i) => {
         const isSelected = betSet.has(num);
         return (
           <div
-            key={num}
+            key={i}
             className={cn(
               'flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium transition-colors',
               isSelected
@@ -192,6 +204,47 @@ const LottoGrid = ({ bet }: { bet: Bet }) => {
       })}
     </div>
   );
+};
+
+const getNumberStats = (data: any[]) => {
+    const frequency: { [key: number]: number } = {};
+    for (let i = 0; i <= 99; i++) {
+        frequency[i] = 0;
+    }
+
+    data.forEach(result => {
+        result.numeros.forEach((num: number) => {
+            if (frequency[num] !== undefined) {
+                frequency[num]++;
+            }
+        });
+    });
+
+    const sortedNumbers = Object.entries(frequency).sort((a, b) => b[1] - a[1]);
+    const hotNumbers = sortedNumbers.slice(0, 20).map(item => parseInt(item[0]));
+    const coldNumbers = sortedNumbers.slice(-20).map(item => parseInt(item[0]));
+
+    return { hotNumbers, coldNumbers };
+};
+
+const getNumberStatsFromFileContent = (content: string) => {
+    const numbers = content.match(/\d+/g)?.map(Number) || [];
+    const frequency: { [key: number]: number } = {};
+    for (let i = 0; i <= 99; i++) {
+        frequency[i] = 0;
+    }
+
+    numbers.forEach(num => {
+        if (frequency[num] !== undefined) {
+            frequency[num]++;
+        }
+    });
+
+    const sortedNumbers = Object.entries(frequency).sort((a, b) => b[1] - a[1]);
+    const hotNumbers = sortedNumbers.slice(0, 20).map(item => parseInt(item[0]));
+    const coldNumbers = sortedNumbers.slice(-20).map(item => parseInt(item[0]));
+
+    return { hotNumbers, coldNumbers };
 };
 
 
@@ -251,6 +304,7 @@ export default function GeneratePage() {
     try {
         const fileContent = await selectedFile.text();
         const { quantity } = form.getValues();
+        const stats = getNumberStatsFromFileContent(fileContent);
 
         toast({
           title: 'A IA está analisando seu arquivo...',
@@ -258,7 +312,7 @@ export default function GeneratePage() {
         });
 
         const response = await analyzeImportedData({
-            data: fileContent,
+            stats,
             numberOfBets: quantity,
         });
 
@@ -290,8 +344,11 @@ export default function GeneratePage() {
           title: 'A IA está pensando...',
           description: 'Analisando o histórico de resultados para criar as melhores apostas.',
         });
+        
+        const stats = getNumberStats(resultsHistory);
+
         const response = await suggestBetsFromHistory({
-          history: resultsHistory,
+          stats,
           strategy: data.aiStrategy || 'balanced',
           numberOfBets: data.quantity,
         });
@@ -864,3 +921,5 @@ export default function GeneratePage() {
     </div>
   );
 }
+
+    

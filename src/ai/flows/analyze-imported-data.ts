@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -11,12 +12,14 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
+const StatsSchema = z.object({
+  hotNumbers: z.array(z.number()).describe('The most frequent numbers.'),
+  coldNumbers: z.array(z.number()).describe('The least frequent numbers.'),
+});
+
+
 const AnalyzeImportedDataInputSchema = z.object({
-  data: z
-    .string()
-    .describe(
-      'The imported data, which could be from a TXT, CSV, or the content extracted from an XLSX file. The data should contain lottery numbers, statistics, or user notes.'
-    ),
+  stats: StatsSchema.describe('The statistics derived from the imported file.'),
   numberOfBets: z
     .number()
     .describe('The number of bet combinations to suggest.'),
@@ -41,16 +44,15 @@ const prompt = ai.definePrompt({
   name: 'analyzeImportedDataPrompt',
   input: {schema: AnalyzeImportedDataInputSchema},
   output: {schema: AnalyzeImportedDataOutputSchema},
-  prompt: `You are an expert Lotomania analyst. Your task is to analyze the provided data, which may come from various file formats like TXT, CSV, or XLSX, and suggest intelligent bet combinations.
+  prompt: `You are an expert Lotomania analyst. Your task is to analyze the provided statistics and suggest intelligent bet combinations.
 
-The data provided is:
-\`\`\`
-{{data}}
-\`\`\`
+The statistics provided are:
+- Hot Numbers (most frequent): {{stats.hotNumbers}}
+- Cold Numbers (least frequent): {{stats.coldNumbers}}
 
 Based on your analysis of this data, you will suggest {{numberOfBets}} bet combinations. Each bet must contain exactly 50 unique numbers, ranging from 0 to 99.
 
-You must also provide a brief summary of your analysis, highlighting any trends, patterns, or key insights you discovered in the data that influenced your suggestions.
+You must also provide a brief summary of your analysis, highlighting how you used the hot and cold numbers to influence your suggestions.
 
 Your final response MUST be a valid JSON object that strictly follows the specified output schema. Do not include any other text or formatting outside of the JSON object.
 `,
@@ -67,3 +69,5 @@ const analyzeImportedDataFlow = ai.defineFlow(
     return output!;
   }
 );
+
+    

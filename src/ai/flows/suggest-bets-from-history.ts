@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -9,12 +10,16 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
+
+const StatsSchema = z.object({
+  hotNumbers: z.array(z.number()).describe('The most frequent numbers.'),
+  coldNumbers: z.array(z.number()).describe('The least frequent numbers.'),
+});
+
 
 const SuggestBetsFromHistoryInputSchema = z.object({
-  history: z
-    .array(z.any())
-    .describe('An array of past lottery results. Each result should be an object with a "numeros" property containing an array of numbers.'),
+  stats: StatsSchema.describe('The statistics derived from the historical data.'),
   strategy: z
     .string()
     .describe('The strategy to use for generating bets. Can be "hot", "cold", or "balanced".'),
@@ -42,30 +47,28 @@ const prompt = ai.definePrompt({
   name: 'suggestBetsFromHistoryPrompt',
   input: { schema: SuggestBetsFromHistoryInputSchema },
   output: { schema: SuggestBetsFromHistoryOutputSchema },
-  prompt: `You are a specialist lottery analyst for the Brazilian Lotomania. Your task is to analyze historical draw data and suggest new bets based on a specific strategy.
+  prompt: `You are a specialist lottery analyst for the Brazilian Lotomania. Your task is to analyze historical statistics and suggest new bets based on a specific strategy.
 
-  Historical Data:
-  You will receive a JSON array of past results. Each result has a 'numeros' field, which is an array of the 20 numbers drawn in that contest.
+  Statistics from Historical Data:
+  - Hot Numbers (most frequent): {{stats.hotNumbers}}
+  - Cold Numbers (least frequent): {{stats.coldNumbers}}
   
-  {{{json history}}}
-
   User's Request:
   - Strategy: {{strategy}}
   - Number of Bets to Generate: {{numberOfBets}}
 
   Your Task:
-  1.  Analyze the provided history based on the chosen strategy:
-      - "hot": Identify numbers that have appeared most frequently in the recent draws. Your suggestions should prioritize these "hot" numbers.
-      - "cold": Identify numbers that have appeared least frequently or are on a long streak of not being drawn. Your suggestions should focus on these "cold" numbers.
-      - "balanced": Create a mix of hot and cold numbers, and also include some numbers from the mid-range of frequency. Aim for a well-rounded ticket.
+  1.  Generate {{numberOfBets}} new bet suggestions based on the chosen strategy:
+      - "hot": Prioritize the "hot" numbers provided.
+      - "cold": Prioritize the "cold" numbers provided.
+      - "balanced": Create a mix of hot and cold numbers, and also include some numbers from the mid-range of frequency.
 
-  2.  Generate {{numberOfBets}} new bet suggestions.
-      - Each bet MUST contain exactly 50 unique numbers.
+  2.  Each bet MUST contain exactly 50 unique numbers.
       - The numbers must be between 0 and 99 (inclusive).
 
-  3.  Provide a brief analysis explaining your choices. For example, mention a few hot or cold numbers you identified and how you used them.
+  3.  Provide a brief analysis explaining your choices. For example, mention a few hot or cold numbers you used and how you incorporated the strategy.
 
-  4.  Return the response in a valid JSON object with the keys "suggestions" (an array of number arrays) and "analysis" (a string).
+  4.  Return the response in a valid JSON object with the keys "suggestions" (an array of number arrays) and "analysis" (a string). Ensure the JSON is well-formed.
   `,
 });
 
@@ -81,3 +84,5 @@ const suggestBetsFromHistoryFlow = ai.defineFlow(
     return output!;
   }
 );
+
+    

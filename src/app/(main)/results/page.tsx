@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { RefreshCw, Upload, X, ExternalLink } from 'lucide-react';
+import { Upload, X, ExternalLink } from 'lucide-react';
 import sampleData from '@/lib/sample-results.json';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -32,6 +32,9 @@ type LottoResult = {
   data: string;
   numeros: number[];
 };
+
+const LOCAL_STORAGE_KEY = 'lotobam_imported_results';
+
 
 /**
  * Parses the content of an Excel file (XLSX) and returns an array of lottery results.
@@ -97,25 +100,47 @@ export default function ResultsPage() {
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState<string>('Todos');
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [importedFileName, setImportedFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dataSource, setDataSource] = useState<'sample' | 'file'>('sample');
 
   useEffect(() => {
     setIsLoading(true);
-    // Load sample data initially
-    const sortedResults = [...sampleData.results].sort((a, b) => b.concurso - a.concurso);
-    setAllResults(sortedResults);
-    setFilteredResults(sortedResults);
+    let initialResults: LottoResult[] = [];
+    let initialDataSource: 'sample' | 'file' = 'sample';
+    let toastMessage = {
+        title: 'Resultados de Exemplo Carregados',
+        description: 'O histórico de concursos padrão foi carregado.',
+    };
+
+    try {
+        const storedResults = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (storedResults) {
+            const parsed = JSON.parse(storedResults);
+            if (parsed.data && parsed.fileName) {
+                initialResults = parsed.data;
+                setImportedFileName(parsed.fileName);
+                initialDataSource = 'file';
+                toastMessage = {
+                    title: 'Resultados Importados Carregados',
+                    description: `Exibindo dados do arquivo "${parsed.fileName}".`,
+                };
+            }
+        }
+    } catch (error) {
+        console.error("Failed to load results from localStorage", error);
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+    }
     
-    const years = Array.from(new Set(sortedResults.map(r => r.data.split('/')[2]))).sort((a, b) => b.localeCompare(a));
-    setAvailableYears(years);
-    
+    if (initialResults.length === 0) {
+        initialResults = [...sampleData.results].sort((a, b) => b.concurso - a.concurso);
+    }
+
+    updateResultsAndFilters(initialResults);
+    setDataSource(initialDataSource);
     setIsLoading(false);
-    toast({
-      title: 'Resultados de Exemplo Carregados',
-      description: 'O histórico de concursos padrão foi carregado.',
-    });
+    toast(toastMessage);
+
   }, [toast]);
 
   const updateResultsAndFilters = (results: LottoResult[]) => {
@@ -165,8 +190,19 @@ export default function ResultsPage() {
         return;
     }
 
+    try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ fileName: file.name, data: parsed }));
+    } catch (error) {
+        console.error("Failed to save results to localStorage", error);
+        toast({
+            variant: "destructive",
+            title: "Erro ao Salvar Dados",
+            description: "Não foi possível salvar os dados no armazenamento local. O arquivo pode ser muito grande.",
+        });
+    }
+
     updateResultsAndFilters(parsed);
-    setSelectedFile(file);
+    setImportedFileName(file.name);
     setDataSource('file');
     setIsLoading(false);
      toast({
@@ -176,7 +212,8 @@ export default function ResultsPage() {
   };
 
   const handleRemoveFile = () => {
-    setSelectedFile(null);
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    setImportedFileName(null);
     if (fileInputRef.current) {
         fileInputRef.current.value = '';
     }
@@ -227,11 +264,11 @@ export default function ResultsPage() {
                     </Link>
                   </Button>
             </div>
-             {selectedFile && (
+             {dataSource === 'file' && importedFileName && (
                 <div className="flex items-center justify-between rounded-md border bg-muted px-3 py-2 text-sm">
                    <div className="flex items-center gap-2">
                      <span className="text-muted-foreground">Arquivo em uso:</span>
-                     <span className="font-medium text-foreground truncate max-w-xs">{selectedFile.name}</span>
+                     <span className="font-medium text-foreground truncate max-w-xs">{importedFileName}</span>
                    </div>
                    <Button variant="ghost" size="icon" onClick={handleRemoveFile} className="h-6 w-6">
                       <X className="h-4 w-4" />
@@ -319,7 +356,7 @@ export default function ResultsPage() {
                         <div className="flex flex-wrap gap-1">
                           {result.numeros.sort((a,b) => a-b).map((num, index) => (
                             <Badge
-                              key={`${num}-${index}`}
+                              key={`${result.concurso}-${num}-${index}`}
                               variant="secondary"
                               className="flex h-6 w-6 items-center justify-center text-xs"
                             >
@@ -345,7 +382,3 @@ export default function ResultsPage() {
     </div>
   );
 }
-
-    
-
-    

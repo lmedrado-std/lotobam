@@ -1,1 +1,6 @@
-// Flows will be imported for their side effects in this file.
+import { config } from 'dotenv';
+config();
+
+import '@/ai/flows/suggest-bet-criteria.ts';
+import '@/ai/flows/analyze-imported-data.ts';
+import '@/ai/flows/include-criteria-with-export.ts';

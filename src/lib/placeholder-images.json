@@ -1,3 +1,34 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "generate-bets",
+      "description": "A vibrant image representing generation of lottery numbers.",
+      "imageUrl": "https://images.unsplash.com/photo-1616711823936-9de02bffaa6b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxhYnN0cmFjdCUyMHBhdHRlcm5zfGVufDB8fHx8MTc2MjY4Njk2N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "abstract patterns"
+    },
+    {
+      "id": "import-file",
+      "description": "An image symbolizing data and files.",
+      "imageUrl": "https://images.unsplash.com/photo-1625834318071-f28f0e51449b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxkYXRhJTIwZG9jdW1lbnR8ZW58MHx8fHwxNzYyNzAwNTQ0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "data document"
+    },
+    {
+      "id": "my-templates",
+      "description": "An image representing saved templates or blueprints.",
+      "imageUrl": "https://images.unsplash.com/photo-1762146828422-50a8bd416d3c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxibHVlcHJpbnQlMjBkZXNpZ258ZW58MHx8fHwxNzYyNjAwMjI1fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "blueprint design"
+    },
+    {
+      "id": "history",
+      "description": "An image of a clock or calendar representing history.",
+      "imageUrl": "https://images.unsplash.com/photo-1712604035381-2bca6b17cff9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxjbG9jayUyMHRpbWV8ZW58MHx8fHwxNzYyNzAwNTQ0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "clock time"
+    },
+    {
+      "id": "user-avatar",
+      "description": "A placeholder for user avatar.",
+      "imageUrl": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxwZXJzb24lMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjI1OTQ3NDd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person portrait"
+    }
+  ]
 }

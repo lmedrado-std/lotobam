@@ -72,7 +72,15 @@ const prompt = ai.definePrompt({
 
   4.  Provide a brief analysis explaining your choices. For example, mention a few hot or cold numbers you used and how you incorporated the strategy.
 
-  5.  Return the response in a valid JSON object with the keys "suggestions" (an array of number arrays) and "analysis" (a string). Ensure the JSON is well-formed.
+  5.  CRITICAL: You MUST return your response as a single, valid JSON object. Do not add any text or formatting before or after the JSON object. The JSON object must strictly adhere to the following structure:
+      {
+        "suggestions": [
+          [... 50 numbers ...],
+          [... 50 numbers ...],
+          ...
+        ],
+        "analysis": "Your textual analysis here."
+      }
   `,
 });
 

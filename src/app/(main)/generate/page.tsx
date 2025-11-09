@@ -57,7 +57,6 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import sampleData from '@/lib/sample-results.json';
 import { suggestBetsFromHistory, type SuggestBetsFromHistoryOutput } from '@/ai/flows/suggest-bets-from-history';
-import { analyzeImportedData, type AnalyzeImportedDataOutput } from '@/ai/flows/analyze-imported-data';
 import { cn } from '@/lib/utils';
 
 
@@ -234,6 +233,47 @@ const modeDescriptions: Record<string, string> = {
 };
 
 
+// Function to extract numbers from CSV/TXT content
+function extractNumbersFromFileContent(fileContent: string): number[][] {
+  const lines = fileContent.split(/\r?\n/);
+  const results: number[][] = [];
+  let headerFound = false;
+
+  for (const line of lines) {
+    const cleanedLine = line.trim();
+    if (!cleanedLine) continue;
+
+    // A simple way to detect a header: check for "Concurso" and "bola"
+    if (cleanedLine.toLowerCase().includes('concurso') && cleanedLine.toLowerCase().includes('bola')) {
+      headerFound = true;
+      continue;
+    }
+
+    // If a header was found, we can be more strict. If not, be more lenient.
+    if (headerFound) {
+       // Split by semicolon or comma
+      const parts = cleanedLine.split(/[;,]/);
+      // Heuristic: if a row has more than 20 parts, it's likely a results row
+      if (parts.length >= 20) {
+        // Assume the first two parts can be contest number and date
+        const potentialNumbers = parts.slice(2).map(p => parseInt(p.trim(), 10));
+        const numbers = potentialNumbers.filter(n => !isNaN(n) && n >= 0 && n <= 99);
+        if (numbers.length >= 20) {
+           results.push(numbers.slice(0, 20));
+        }
+      }
+    } else {
+      // Lenient parsing for files without a clear header
+      const parts = cleanedLine.split(/[;, \t]+/);
+      const numbers = parts.map(p => parseInt(p.trim(), 10)).filter(n => !isNaN(n) && n >= 0 && n <= 99);
+      if (numbers.length === 50 || numbers.length === 20) { // Common bet/result lengths
+        results.push(numbers);
+      }
+    }
+  }
+  return results;
+}
+
 export default function GeneratePage() {
   const [generatedBets, setGeneratedBets] = useState<Bet[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -299,17 +339,16 @@ export default function GeneratePage() {
         const fileContent = await selectedFile.text();
         
         toast({
-          title: 'A IA está lendo seu arquivo...',
-          description: 'Extraindo os números dos concursos para análise.',
+          title: 'Lendo seu arquivo...',
+          description: 'Extraindo os números para análise.',
         });
-
-        const extractionResponse = await analyzeImportedData({ fileContent });
         
-        if (!extractionResponse || !extractionResponse.results) {
-          throw new Error("A resposta da IA não contém os resultados esperados.");
+        const existingBets = extractNumbersFromFileContent(fileContent);
+
+        if (existingBets.length === 0) {
+          throw new Error("Nenhum número de aposta ou resultado válido foi encontrado no arquivo.");
         }
         
-        const existingBets = extractionResponse.results;
         const stats = getNumberStatsFromResultsArray(existingBets);
 
         const { quantity } = form.getValues();
@@ -336,10 +375,20 @@ export default function GeneratePage() {
               manualExclusion: Array.from(manualExclusionSet),
           });
           
+          if (!response || !response.suggestions) {
+            // If the AI response is invalid, stop trying.
+            throw new Error("A IA retornou uma resposta inválida. Tente novamente.");
+          }
+
           const newUniqueSuggestions = response.suggestions.filter(suggestion => {
-              const sortedSuggestion = suggestion.sort(lottoSort);
+              const sortedSuggestion = [...suggestion].sort(lottoSort);
               const suggestionKey = JSON.stringify(sortedSuggestion);
-              return !existingBetsSet.has(suggestionKey);
+              if (existingBetsSet.has(suggestionKey)) {
+                return false;
+              }
+              // Also check against newly generated suggestions to ensure uniqueness within the batch
+              const isDuplicateInBatch = allSuggestions.some(existing => JSON.stringify([...existing].sort(lottoSort)) === suggestionKey);
+              return !isDuplicateInBatch;
           });
 
           allSuggestions.push(...newUniqueSuggestions);
@@ -354,19 +403,20 @@ export default function GeneratePage() {
           })
         }
 
-        setGeneratedBets(allSuggestions.slice(0, quantity).map(bet => bet.sort(lottoSort)));
+        const finalBets = allSuggestions.slice(0, quantity).map(bet => bet.sort(lottoSort));
+        setGeneratedBets(finalBets);
         
         toast({
           title: 'Apostas geradas com base no arquivo!',
-          description: `Análise concluída. ${allSuggestions.slice(0, quantity).length} novas apostas foram criadas.`,
+          description: `Análise concluída. ${finalBets.length} novas apostas foram criadas.`,
         })
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("File-based AI generation failed:", error);
         toast({
             variant: "destructive",
             title: "Erro ao analisar o arquivo",
-            description: "Verifique se o arquivo está no formato correto (CSV ou TXT) ou tente novamente.",
+            description: error.message || "Verifique se o arquivo está no formato correto (CSV ou TXT) ou tente novamente.",
         });
     } finally {
         setIsGenerating(false);
@@ -414,29 +464,13 @@ export default function GeneratePage() {
         const numbersFromHistory = resultsHistory.flatMap(result => result.numeros);
         exclusionSet = new Set(numbersFromHistory);
       } else if (data.avoidanceBase === 'arquivo') {
-        if (!selectedFile) {
           toast({
             variant: "destructive",
-            title: "Nenhum arquivo selecionado",
-            description: "Por favor, selecione um arquivo para usar como base de exclusão.",
+            title: "Use a seção de Upload",
+            description: "Para evitar números com base em um arquivo, por favor, use a seção 'Gerar com Base em Arquivo' abaixo.",
           });
           setIsGenerating(false);
           return;
-        }
-        try {
-          const fileContent = await selectedFile.text();
-          const extractionResponse = await analyzeImportedData({ fileContent });
-          const numbersFromFile = extractionResponse.results.flat();
-          exclusionSet = new Set(numbersFromFile);
-        } catch (e) {
-          toast({
-            variant: "destructive",
-            title: "Erro ao ler o arquivo",
-            description: "Não foi possível processar os números do arquivo.",
-          });
-          setIsGenerating(false);
-          return;
-        }
       }
     } else {
         exclusionSet = parseManualNumbers(data.manualNumbers);
@@ -1015,3 +1049,4 @@ export default function GeneratePage() {
     </div>
   );
 }
+

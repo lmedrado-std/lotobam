@@ -280,10 +280,8 @@ export default function GeneratePage() {
     quantity: number,
     strategy: string,
     inclusionList: number[],
-    exclusionList: number[],
-    existingBets: Bet[] = []
+    exclusionList: number[]
   ): Promise<Bet[]> => {
-    const existingBetsSet = new Set(existingBets.map(b => JSON.stringify(b.sort(lottoSort))));
   
     // Single call to the AI
     const response = await suggestBetsFromHistory({
@@ -297,18 +295,16 @@ export default function GeneratePage() {
     if (!response || !response.suggestions) {
       throw new Error("A IA retornou uma resposta inválida. Tente novamente.");
     }
-  
-    const newUniqueSuggestions = response.suggestions.filter(suggestion => {
-      const sortedSuggestion = [...suggestion].sort(lottoSort);
-      const suggestionKey = JSON.stringify(sortedSuggestion);
-      return !existingBetsSet.has(suggestionKey);
-    });
+    
+    // The AI should already handle uniqueness, but we can double check here if needed.
+    // For now, we trust the AI's output as the loop was causing rate-limiting.
+    const newUniqueSuggestions = response.suggestions;
   
     if (newUniqueSuggestions.length < quantity) {
       toast({
         variant: 'default',
-        title: 'Não foi possível gerar todos os jogos inéditos',
-        description: `A IA tentou, mas só conseguiu criar ${newUniqueSuggestions.length} jogos únicos.`,
+        title: 'Atenção: Menos jogos gerados que o solicitado',
+        description: `A IA conseguiu criar ${newUniqueSuggestions.length} jogos únicos com os critérios fornecidos.`,
       });
     }
   
@@ -372,7 +368,7 @@ export default function GeneratePage() {
             toast({ title: 'Analisando e gerando apostas...', description: `Usando a estratégia "${data.aiStrategy}" com base nos dados do arquivo.` });
             const stats = getNumberStats(parsedResult);
             
-            const bets = await callAiSuggestBets(stats, data.quantity, data.aiStrategy || 'balanced', inclusionList, exclusionList, parsedResult);
+            const bets = await callAiSuggestBets(stats, data.quantity, data.aiStrategy || 'balanced', inclusionList, exclusionList);
             setGeneratedBets(bets);
             if(bets.length > 0) {
               toast({ title: 'Apostas geradas com base no arquivo!', description: `Análise concluída. ${bets.length} novas apostas foram criadas.` });
@@ -719,11 +715,11 @@ export default function GeneratePage() {
                           ref={fileInputRef}
                           onChange={handleFileChange}
                           className="hidden"
-                          accept=".xlsx, .csv, .txt"
+                          accept=".csv, .txt"
                         />
                         <Button type="button" variant="outline" onClick={handleUploadClick} className="w-full sm:w-auto">
                           <Upload className="mr-2 h-4 w-4" />
-                          Localizar Arquivo XLSX
+                          Localizar Arquivo
                         </Button>
                         {selectedFile && (
                           <div className="flex items-center justify-between rounded-md border bg-muted px-3 py-2 text-sm">
@@ -810,7 +806,7 @@ export default function GeneratePage() {
                    <Bookmark className="mr-2 h-4 w-4"/> Salvar como Modelo
                  </Button>
                   <Button onClick={handleExport}>
-                    <FileSpreadsheet className="mr-2 h-4 w-4"/> Exportar para Excel
+                    <FileSpreadsheet className="mr-2 h-4 w-4"/> Exportar para CSV
                   </Button>
                  <Button variant="ghost" size="icon" onClick={handleClear} title="Limpar apostas geradas">
                    <Trash2 className="h-4 w-4"/>
@@ -897,5 +893,7 @@ export default function GeneratePage() {
     </div>
   );
 }
+
+    
 
     

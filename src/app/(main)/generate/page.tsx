@@ -69,7 +69,7 @@ const formSchema = z.object({
   quantity: z.coerce
     .number()
     .min(1, { message: 'A quantidade deve ser no mínimo 1.' })
-    .max(100, { message: 'A quantidade não pode ser maior que 100.' }),
+    .max(500, { message: 'A quantidade não pode ser maior que 500.' }),
   manualNumbers: z.string().optional(),
   aiStrategy: z.string().optional(),
   numbersToInclude: z.string().optional(),
@@ -618,7 +618,7 @@ export default function GeneratePage() {
                       <Input type="number" placeholder="Ex: 10" {...field} />
                     </FormControl>
                     <FormDescription>
-                      Quantas apostas você deseja gerar (máx: 100).
+                      Quantas apostas você deseja gerar (máx: 500).
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -916,3 +916,6 @@ export default function GeneratePage() {
     
 
 
+
+
+    

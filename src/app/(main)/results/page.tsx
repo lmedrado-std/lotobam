@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -20,16 +20,75 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { RefreshCw, Download } from 'lucide-react';
+import { RefreshCw, Download, Upload, X } from 'lucide-react';
 import sampleData from '@/lib/sample-results.json';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import * as XLSX from 'xlsx';
+import { Input } from '@/components/ui/input';
 
 type LottoResult = {
   concurso: number;
   data: string;
   numeros: number[];
 };
+
+/**
+ * Parses the content of an Excel file (XLSX) and returns an array of lottery results.
+ */
+async function parseLotteryFile(file: File): Promise<LottoResult[]> {
+    const reader = new FileReader();
+    return new Promise((resolve, reject) => {
+        reader.onerror = () => {
+            reader.abort();
+            reject(new Error("Não foi possível ler o arquivo."));
+        };
+
+        reader.onload = (event) => {
+            try {
+                const data = event.target?.result;
+                if (!data) {
+                    resolve([]);
+                    return;
+                }
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json: (string | number)[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                const results: LottoResult[] = [];
+                let headerFound = false;
+                
+                for (const row of json) {
+                    if (!Array.isArray(row)) continue;
+
+                    // Find the header row by looking for "Concurso"
+                    if (!headerFound && String(row[0]).trim().toLowerCase() === 'concurso') {
+                        headerFound = true;
+                        continue; // Skip header row
+                    }
+                    
+                    if (headerFound && row.length >= 22) {
+                        const concurso = parseInt(String(row[0]), 10);
+                        const data = String(row[1]); // Keep date as string
+                        const numeros = row.slice(2, 22).map(n => parseInt(String(n), 10));
+                        
+                        if (!isNaN(concurso) && data && numeros.length === 20 && numeros.every(n => !isNaN(n) && n >= 0 && n <= 99)) {
+                            results.push({ concurso, data, numeros });
+                        }
+                    }
+                }
+                resolve(results.sort((a, b) => b.concurso - a.concurso));
+            } catch (e) {
+                console.error("Erro ao processar o arquivo XLSX:", e);
+                resolve([]); // Return empty array on parsing error
+            }
+        };
+
+        reader.readAsArrayBuffer(file);
+    });
+}
+
 
 export default function ResultsPage() {
   const { toast } = useToast();
@@ -38,24 +97,36 @@ export default function ResultsPage() {
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState<string>('Todos');
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dataSource, setDataSource] = useState<'sample' | 'file'>('sample');
 
   useEffect(() => {
     setIsLoading(true);
-    setTimeout(() => {
-      const sortedResults = [...sampleData.results].sort((a, b) => b.concurso - a.concurso);
-      setAllResults(sortedResults);
-      setFilteredResults(sortedResults);
-
-      const years = Array.from(new Set(sortedResults.map(r => r.data.split('/')[2]))).sort((a, b) => b.localeCompare(a));
-      setAvailableYears(years);
-      
-      setIsLoading(false);
-      toast({
-        title: 'Resultados Carregados',
-        description: 'O histórico de concursos foi carregado com sucesso.',
-      });
-    }, 1000);
+    // Load sample data initially
+    const sortedResults = [...sampleData.results].sort((a, b) => b.concurso - a.concurso);
+    setAllResults(sortedResults);
+    setFilteredResults(sortedResults);
+    
+    const years = Array.from(new Set(sortedResults.map(r => r.data.split('/')[2]))).sort((a, b) => b.localeCompare(a));
+    setAvailableYears(years);
+    
+    setIsLoading(false);
+    toast({
+      title: 'Resultados de Exemplo Carregados',
+      description: 'O histórico de concursos padrão foi carregado.',
+    });
   }, [toast]);
+
+  const updateResultsAndFilters = (results: LottoResult[]) => {
+      const sorted = results.sort((a,b) => b.concurso - a.concurso);
+      setAllResults(sorted);
+      setFilteredResults(sorted);
+
+      const years = Array.from(new Set(sorted.map(r => r.data.split('/')[2]))).sort((a, b) => b.localeCompare(a));
+      setAvailableYears(years);
+      setSelectedYear('Todos');
+  }
 
   const handleYearFilter = (year: string) => {
     setSelectedYear(year);
@@ -66,11 +137,54 @@ export default function ResultsPage() {
     }
   };
 
-  const handleUpdateResults = () => {
-    toast({
-      title: 'Resultados Atualizados',
-      description: 'Você já tem a lista de concursos mais recente.',
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast({
+          variant: "destructive",
+          title: "Arquivo muito grande",
+          description: "Por favor, selecione um arquivo com menos de 5MB.",
+        });
+        return;
+    }
+    
+    setIsLoading(true);
+    toast({ title: "Processando arquivo...", description: "Lendo e validando os resultados da planilha." });
+
+    const parsed = await parseLotteryFile(file);
+
+    if (parsed.length === 0) {
+        toast({
+            variant: "destructive",
+            title: "Arquivo Inválido ou Vazio",
+            description: "Nenhum resultado válido foi encontrado. Verifique o formato do arquivo.",
+        });
+        setIsLoading(false);
+        return;
+    }
+
+    updateResultsAndFilters(parsed);
+    setSelectedFile(file);
+    setDataSource('file');
+    setIsLoading(false);
+     toast({
+        title: "Resultados Importados!",
+        description: `${parsed.length} concursos foram carregados com sucesso do seu arquivo.`,
     });
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+    }
+    // Revert to sample data
+    const sortedResults = [...sampleData.results].sort((a, b) => b.concurso - a.concurso);
+    updateResultsAndFilters(sortedResults);
+    setDataSource('sample');
+    toast({ title: "Arquivo Removido", description: "Voltando a exibir os resultados de exemplo."});
   };
   
   const lastContest = allResults.length > 0 ? allResults[0].concurso : 'N/A';
@@ -82,24 +196,49 @@ export default function ResultsPage() {
           Resultados da Loteria
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Veja os últimos resultados e mantenha a base de dados atualizada.
+          Importe e visualize o histórico de concursos.
         </p>
       </div>
       
       <Card>
         <CardHeader>
-          <CardTitle>Atualizar Base de Resultados</CardTitle>
+          <CardTitle>Fonte de Dados dos Resultados</CardTitle>
            <CardDescription>
-            Mantenha sua base de análise sempre atualizada. Baixe a planilha com todos os resultados da loteria e use-a na seção "Gerar com Base em Arquivo" na página de geração.
+            Você pode usar nossa base de dados de exemplo ou importar sua própria planilha de resultados da Lotomania.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-            <Button asChild>
-                <Link href="https://asloterias.com.br/download-todos-resultados-lotomania" target="_blank" rel="noopener noreferrer">
-                    <Download className="mr-2 h-4 w-4" />
-                    Baixar Planilha de Resultados
-                </Link>
-            </Button>
+        <CardContent className="space-y-4">
+             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <Input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept=".xlsx"
+                  />
+                  <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full sm:w-auto">
+                    <Upload className="mr-2 h-4 w-4" />
+                    Importar Planilha (.xlsx)
+                  </Button>
+                  <Button asChild>
+                    <Link href="https://asloterias.com.br/download-todos-resultados-lotomania" target="_blank" rel="noopener noreferrer">
+                        <Download className="mr-2 h-4 w-4" />
+                        Baixar Planilha Padrão
+                    </Link>
+                  </Button>
+            </div>
+             {selectedFile && (
+                <div className="flex items-center justify-between rounded-md border bg-muted px-3 py-2 text-sm">
+                   <div className="flex items-center gap-2">
+                     <span className="text-muted-foreground">Arquivo em uso:</span>
+                     <span className="font-medium text-foreground truncate max-w-xs">{selectedFile.name}</span>
+                   </div>
+                   <Button variant="ghost" size="icon" onClick={handleRemoveFile} className="h-6 w-6">
+                      <X className="h-4 w-4" />
+                      <span className="sr-only">Remover arquivo e usar dados de exemplo</span>
+                   </Button>
+                </div>
+            )}
         </CardContent>
       </Card>
 
@@ -107,7 +246,7 @@ export default function ResultsPage() {
         <CardHeader>
           <CardTitle>Filtrar por Ano</CardTitle>
            <CardDescription>
-            Temos também a opção de exibir os resultados por ano, basta clicar em um ano abaixo!
+            Navegue pelos resultados do ano desejado.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -148,14 +287,10 @@ export default function ResultsPage() {
                  <CardDescription>Carregando resultados...</CardDescription>
               ) : (
                 <CardDescription>
-                  Exibindo {filteredResults.length} de {allResults.length} resultados. Último concurso: {lastContest}.
+                  Exibindo {filteredResults.length} de {allResults.length} resultados. Último concurso: {lastContest}. Fonte: {dataSource === 'file' ? 'Arquivo Importado' : 'Dados de Exemplo'}
                 </CardDescription>
               )}
             </div>
-            <Button onClick={handleUpdateResults} disabled={isLoading}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Atualizar Resultados
-            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -210,3 +345,5 @@ export default function ResultsPage() {
     </div>
   );
 }
+
+    

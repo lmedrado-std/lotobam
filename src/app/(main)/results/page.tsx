@@ -20,8 +20,9 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Download, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import sampleData from '@/lib/sample-results.json';
+import { cn } from '@/lib/utils';
 
 type LottoResult = {
   concurso: number;
@@ -31,34 +32,47 @@ type LottoResult = {
 
 export default function ResultsPage() {
   const { toast } = useToast();
-  const [results, setResults] = useState<LottoResult[]>([]);
+  const [allResults, setAllResults] = useState<LottoResult[]>([]);
+  const [filteredResults, setFilteredResults] = useState<LottoResult[]>([]);
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
+  const [selectedYear, setSelectedYear] = useState<string>('Todos');
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load results on component mount
   useEffect(() => {
-    // Simulates an initial network request to fetch results
+    setIsLoading(true);
     setTimeout(() => {
-      // Sort results to ensure the latest is always first
       const sortedResults = [...sampleData.results].sort((a, b) => b.concurso - a.concurso);
-      setResults(sortedResults);
+      setAllResults(sortedResults);
+      setFilteredResults(sortedResults);
+
+      const years = Array.from(new Set(sortedResults.map(r => r.data.split('/')[2]))).sort((a, b) => b.localeCompare(a));
+      setAvailableYears(years);
+      
       setIsLoading(false);
       toast({
         title: 'Resultados Carregados',
         description: 'O histórico de concursos foi carregado com sucesso.',
       });
     }, 1000);
-  }, [toast]); // Added toast to dependency array
+  }, [toast]);
+
+  const handleYearFilter = (year: string) => {
+    setSelectedYear(year);
+    if (year === 'Todos') {
+      setFilteredResults(allResults);
+    } else {
+      setFilteredResults(allResults.filter(result => result.data.endsWith(year)));
+    }
+  };
 
   const handleUpdateResults = () => {
-    // In a real app, you would fetch only new results.
-    // Here, we just confirm that the data is up-to-date.
     toast({
       title: 'Resultados Atualizados',
       description: 'Você já tem a lista de concursos mais recente.',
     });
   };
   
-  const lastContest = results.length > 0 ? results[0].concurso : 'N/A';
+  const lastContest = allResults.length > 0 ? allResults[0].concurso : 'N/A';
 
   return (
     <div className="flex flex-col gap-8">
@@ -70,6 +84,42 @@ export default function ResultsPage() {
           Veja os últimos resultados e mantenha a base de dados atualizada.
         </p>
       </div>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtrar por Ano</CardTitle>
+           <CardDescription>
+            Temos também a opção de exibir os resultados por ano, basta clicar em um ano abaixo!
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="grid grid-cols-4 gap-2 md:grid-cols-8 lg:grid-cols-12">
+              {Array.from({length: 12}).map((_, i) => <div key={i} className="h-8 w-16 rounded-md bg-muted animate-pulse" />)}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+                <Button
+                    variant={selectedYear === 'Todos' ? 'link' : 'ghost'}
+                    onClick={() => handleYearFilter('Todos')}
+                    className={cn('p-0 h-auto text-base', selectedYear === 'Todos' && 'font-bold underline')}
+                >
+                    Todos
+                </Button>
+              {availableYears.map(year => (
+                <Button
+                  key={year}
+                  variant={selectedYear === year ? 'link' : 'ghost'}
+                  onClick={() => handleYearFilter(year)}
+                  className={cn('p-0 h-auto text-base', selectedYear === year && 'font-bold underline')}
+                >
+                  {year}
+                </Button>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -80,7 +130,7 @@ export default function ResultsPage() {
                  <CardDescription>Carregando resultados...</CardDescription>
               ) : (
                 <CardDescription>
-                  Exibindo {results.length} resultados. Último concurso carregado: {lastContest}.
+                  Exibindo {filteredResults.length} de {allResults.length} resultados. Último concurso: {lastContest}.
                 </CardDescription>
               )}
             </div>
@@ -95,7 +145,7 @@ export default function ResultsPage() {
             <div className="flex h-64 items-center justify-center rounded-md border border-dashed">
                  <p className="text-muted-foreground">Carregando resultados...</p>
             </div>
-          ) : results.length > 0 ? (
+          ) : filteredResults.length > 0 ? (
             <div className="relative max-h-[600px] overflow-auto">
               <Table>
                 <TableHeader className="sticky top-0 bg-card">
@@ -106,7 +156,7 @@ export default function ResultsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {results.map((result) => (
+                  {filteredResults.map((result) => (
                     <TableRow key={result.concurso}>
                       <TableCell className="font-medium">
                         {result.concurso}
@@ -133,7 +183,7 @@ export default function ResultsPage() {
           ) : (
             <div className="flex h-64 items-center justify-center rounded-md border border-dashed">
                  <p className="text-muted-foreground">
-                   Nenhum resultado para exibir.
+                   Nenhum resultado para exibir para o ano de {selectedYear}.
                  </p>
             </div>
           )}

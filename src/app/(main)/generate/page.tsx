@@ -454,7 +454,7 @@ export default function GeneratePage() {
     }
     
     const fileContent = formatBets(generatedBets, 'csv');
-    downloadFile(fileContent, `lotomania-apostas.csv`, 'text/csv;charset=utf-8;');
+    downloadFile(fileContent, `lotobam-apostas.csv`, 'text/csv;charset=utf-8;');
 
     toast({
       title: 'Exportação Concluída',
@@ -574,7 +574,7 @@ export default function GeneratePage() {
           Gerar Apostas
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Crie ou importe apostas para a Lotomania usando critérios avançados.
+          Crie ou importe apostas usando critérios avançados.
         </p>
       </div>
 

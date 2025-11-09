@@ -79,7 +79,7 @@ export default function ResultsPage() {
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="font-headline text-3xl font-bold tracking-tight">
-          Resultados da Lotomania
+          Resultados da Loteria
         </h1>
         <p className="mt-2 text-muted-foreground">
           Veja os últimos resultados e mantenha a base de dados atualizada.
@@ -90,7 +90,7 @@ export default function ResultsPage() {
         <CardHeader>
           <CardTitle>Atualizar Base de Resultados</CardTitle>
            <CardDescription>
-            Mantenha sua base de análise sempre atualizada. Baixe a planilha com todos os resultados da Lotomania e use-a na seção "Gerar com Base em Arquivo" na página de geração.
+            Mantenha sua base de análise sempre atualizada. Baixe a planilha com todos os resultados da loteria e use-a na seção "Gerar com Base em Arquivo" na página de geração.
           </CardDescription>
         </CardHeader>
         <CardContent>

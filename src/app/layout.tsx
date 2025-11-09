@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'Lotomania Master',
-  description: 'Sua ferramenta definitiva para gerar e analisar apostas da Lotomania.',
+  title: 'LotoBam',
+  description: 'Sua ferramenta definitiva para gerar e analisar apostas de loteria.',
 };
 
 export default function RootLayout({

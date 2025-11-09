@@ -1,188 +1,31 @@
-/**
- * @fileoverview Firestore Security Rules for Lotomania Master application.
- *
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for all data. Each user can only
- * access their own data, ensuring privacy and preventing unauthorized access.
- *
- * Data Structure:
- * - User profiles are stored in `/users/{userId}`.
- * - Games, templates, uploads, and download history are stored in user-specific subcollections
- *   under `/users/{userId}`.
- *
- * Key Security Decisions:
- * - User listing is disallowed to protect user privacy.
- * - All write operations are validated against the authenticated user's ID to prevent
- *   impersonation and data manipulation.
- * - Data consistency is enforced by validating that the `ownerId` field in subcollection
- *   documents matches the `userId` in the path.
- *
- * Denormalization for Authorization:
- * The data model denormalizes ownership by including an `ownerId` field in documents within
- * user-specific subcollections. This avoids costly `get()` calls to verify ownership.
- *
- * Structural Segregation:
- * The use of user-specific subcollections ensures that all data within a given path has
- * the same security posture (owner-only access), simplifying rules and improving performance.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    /**
-     * @description Rules for user profiles.
-     * @path /users/{userId}
-     * @allow (create) - If the user is creating their own profile (auth.uid == userId).
-     * @allow (get, list, update, delete) - If the user is accessing their own profile (auth.uid == userId).
-     * @deny (create) - If the user is trying to create a profile for another user (auth.uid != userId).
-     * @deny (get, list, update, delete) - If the user is trying to access another user's profile (auth.uid != userId).
-     * @principle Enforces document ownership for all operations.
-     */
     match /users/{userId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-
-      // Allow the user to create their own profile.
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-
-      // Allow the user to read, update, and delete their own profile.
-      allow get, update, delete: if isOwner(userId) && resource.data.id == userId;
-
-      // Listing all users is not allowed.
-      allow list: if false;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    /**
-     * @description Rules for games created by a user.
-     * @path /users/{userId}/games/{gameId}
-     * @allow (create) - If the user is creating a game under their own user ID (auth.uid == userId).
-     * @allow (get, list, update, delete) - If the user is accessing their own game (auth.uid == userId).
-     * @deny (create) - If the user is trying to create a game for another user (auth.uid != userId).
-     * @deny (get, list, update, delete) - If the user is trying to access another user's game (auth.uid != userId).
-     * @principle Enforces document ownership for all operations.
-     */
     match /users/{userId}/games/{gameId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      // Allow the user to create a game under their own user ID.
-      allow create: if isOwner(userId) && request.resource.data.ownerId == userId;
-
-      // Allow the user to read and list their own games.
-      allow get, list: if isOwner(userId);
-
-      // Allow the user to update and delete their own games, but only if the document exists
-      allow update, delete: if isExistingOwner(userId) && resource.data.ownerId == userId;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    /**
-     * @description Rules for templates created by a user.
-     * @path /users/{userId}/templates/{templateId}
-     * @allow (create) - If the user is creating a template under their own user ID (auth.uid == userId).
-     * @allow (get, list, update, delete) - If the user is accessing their own template (auth.uid == userId).
-     * @deny (create) - If the user is trying to create a template for another user (auth.uid != userId).
-     * @deny (get, list, update, delete) - If the user is trying to access another user's template (auth.uid != userId).
-     * @principle Enforces document ownership for all operations.
-     */
     match /users/{userId}/templates/{templateId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      // Allow the user to create a template under their own user ID.
-      allow create: if isOwner(userId) && request.resource.data.ownerId == userId;
-
-      // Allow the user to read and list their own templates.
-      allow get, list: if isOwner(userId);
-
-      // Allow the user to update and delete their own templates, but only if the document exists
-      allow update, delete: if isExistingOwner(userId) && resource.data.ownerId == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow update, delete: if request.auth.uid == resource.data.ownerId;
     }
 
-    /**
-     * @description Rules for uploads initiated by a user.
-     * @path /users/{userId}/uploads/{uploadId}
-     * @allow (create) - If the user is creating an upload record under their own user ID (auth.uid == userId).
-     * @allow (get, list, update, delete) - If the user is accessing their own upload record (auth.uid == userId).
-     * @deny (create) - If the user is trying to create an upload record for another user (auth.uid != userId).
-     * @deny (get, list, update, delete) - If the user is trying to access another user's upload record (auth.uid != userId).
-     * @principle Enforces document ownership for all operations.
-     */
+    // Public templates can be read by anyone
+    match /templates/{templateId} {
+      allow read: if resource.data.public == true;
+    }
+
     match /users/{userId}/uploads/{uploadId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      // Allow the user to create an upload record under their own user ID.
-      allow create: if isOwner(userId) && request.resource.data.ownerId == userId;
-
-      // Allow the user to read and list their own uploads.
-      allow get, list: if isOwner(userId);
-
-      // Allow the user to update and delete their own uploads, but only if the document exists
-      allow update, delete: if isExistingOwner(userId) && resource.data.ownerId == userId;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    /**
-     * @description Rules for download history of games by users.
-     * @path /users/{userId}/downloadHistory/{downloadHistoryId}
-     * @allow (create) - If the user is creating a download history record under their own user ID (auth.uid == userId).
-     * @allow (get, list, update, delete) - If the user is accessing their own download history record (auth.uid == userId).
-     * @deny (create) - If the user is trying to create a download history record for another user (auth.uid != userId).
-     * @deny (get, list, update, delete) - If the user is trying to access another user's download history record (auth.uid != userId).
-     * @principle Enforces document ownership for all operations.
-     */
     match /users/{userId}/downloadHistory/{downloadHistoryId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      // Allow the user to create a download history record under their own user ID.
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-
-      // Allow the user to read and list their own download history.
-      allow get, list: if isOwner(userId);
-
-      // Allow the user to update and delete their own download history, but only if the document exists
-      allow update, delete: if isExistingOwner(userId) && resource.data.userId == userId;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

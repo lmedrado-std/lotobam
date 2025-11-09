@@ -1,7 +1,6 @@
 {
   "entities": {
     "User": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
       "description": "Represents a user of the Lotomania Master application.",
@@ -21,25 +20,16 @@
           "format": "date-time"
         }
       },
-      "required": [
-        "id",
-        "email",
-        "createdAt"
-      ]
+      "required": ["id", "email", "createdAt"]
     },
     "Game": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Game",
       "type": "object",
       "description": "Represents a Lotomania game created by a user.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Game entity."
-        },
         "ownerId": {
           "type": "string",
-          "description": "Reference to User. (Relationship: User 1:N Game). The user who created the game."
+          "description": "The user who created the game."
         },
         "title": {
           "type": "string",
@@ -49,104 +39,72 @@
           "type": "array",
           "description": "Array of arrays, where each inner array represents a bet (50 numbers).",
           "items": {
-            "type": "number"
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
           }
         },
         "criteria": {
-          "type": "string",
-          "description": "Generation criteria used for the game (e.g., 'balanced', 'random')."
-        },
-        "criteriaParams": {
-          "type": "string",
-          "description": "JSON string that stores generation criteria parameter settings. Stored as a string for database agnosticism, but converted to JSON at application level."
+          "type": "object",
+          "description": "Generation criteria used for the game."
         },
         "source": {
           "type": "string",
-          "description": "Source of the game (e.g., 'generated', 'uploaded', 'manual')."
+          "enum": ["generated", "uploaded", "manual"]
         },
         "templateId": {
           "type": "string",
-          "description": "Reference to Template. (Relationship: Template 1:N Game). Optional reference to the template used to create the game."
+          "description": "Optional reference to the template used to create the game."
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp indicating when the game was created.",
           "format": "date-time"
         },
         "tags": {
           "type": "array",
-          "description": "Array of tags associated with the game (e.g., 'favorite', 'concurso-1234').",
           "items": {
             "type": "string"
           }
         },
-        "isPublic": {
-          "type": "boolean",
-          "description": "Indicates whether the game is publicly accessible."
+        "public": {
+          "type": "boolean"
         }
       },
-      "required": [
-        "id",
-        "ownerId",
-        "numbers",
-        "criteria",
-        "source",
-        "createdAt"
-      ]
+      "required": ["ownerId", "numbers", "criteria", "source", "createdAt"]
     },
     "Template": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Template",
       "type": "object",
       "description": "Represents a game generation template saved by a user.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Template entity."
-        },
         "ownerId": {
           "type": "string",
-          "description": "Reference to User. (Relationship: User 1:N Template). The user who created the template."
+          "description": "The user who created the template."
         },
         "name": {
           "type": "string",
           "description": "Name of the template."
         },
         "criteria": {
-          "type": "string",
-          "description": "Generation criteria associated with the template (e.g., 'balanced', 'hot/cold')."
-        },
-        "criteriaParams": {
-          "type": "string",
-          "description": "JSON string that stores generation criteria parameter settings. Stored as a string for database agnosticism, but converted to JSON at application level."
+          "type": "object",
+          "description": "Generation criteria associated with the template."
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp indicating when the template was created.",
           "format": "date-time"
         }
       },
-      "required": [
-        "id",
-        "ownerId",
-        "name",
-        "criteria",
-        "createdAt"
-      ]
+      "required": ["ownerId", "name", "criteria", "createdAt"]
     },
     "Upload": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Upload",
       "type": "object",
       "description": "Represents a file upload containing game data or statistics.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Upload entity."
-        },
         "ownerId": {
           "type": "string",
-          "description": "Reference to User. (Relationship: User 1:N Upload). The user who initiated the upload."
+          "description": "The user who initiated the upload."
         },
         "filePath": {
           "type": "string",
@@ -154,172 +112,72 @@
         },
         "status": {
           "type": "string",
-          "description": "Status of the upload processing (e.g., 'processed', 'error')."
+          "enum": ["processed", "error"]
         },
         "resultsSummary": {
-          "type": "string",
-          "description": "JSON string summarizing the results of the upload processing. Stored as a string for database agnosticism, but converted to JSON at application level."
-        },
-        "uploadType": {
-          "type": "string",
-          "description": "Categorizes the type of upload, such as 'game_data' or 'statistics'."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp indicating when the upload was initiated.",
-          "format": "date-time"
+          "type": "object"
         }
       },
-      "required": [
-        "id",
-        "ownerId",
-        "filePath",
-        "status",
-        "createdAt"
-      ]
+      "required": ["ownerId", "filePath", "status"]
     },
     "DownloadHistory": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "DownloadHistory",
       "type": "object",
       "description": "Represents the history of game downloads by users.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the DownloadHistory entry."
-        },
         "userId": {
           "type": "string",
-          "description": "Reference to User. (Relationship: User 1:N DownloadHistory). The user who downloaded the game."
+          "description": "The user who downloaded the game."
         },
         "gameId": {
           "type": "string",
-          "description": "Reference to Game. (Relationship: Game 1:N DownloadHistory). The game that was downloaded."
+          "description": "The game that was downloaded."
         },
         "downloadFormat": {
           "type": "string",
-          "description": "Format in which the game was downloaded (e.g., 'CSV', 'JSON', 'TXT')."
+          "enum": ["CSV", "JSON", "TXT"]
         },
         "downloadedAt": {
           "type": "string",
-          "description": "Timestamp indicating when the game was downloaded.",
           "format": "date-time"
         }
       },
-      "required": [
-        "id",
-        "userId",
-        "gameId",
-        "downloadFormat",
-        "downloadedAt"
-      ]
+      "required": ["userId", "gameId", "downloadFormat", "downloadedAt"]
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
+    "providers": ["password", "anonymous"]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user profile information. Path-based ownership ensures only the user can access their profile.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            }
-          ]
-        }
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
       },
-      {
-        "path": "/users/{userId}/games/{gameId}",
-        "definition": {
-          "entityName": "Game",
-          "schema": {
-            "$ref": "#/backend/entities/Game"
-          },
-          "description": "Stores game data created by a user. Path-based ownership ensures only the user can access their games.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            },
-            {
-              "name": "gameId",
-              "description": "The unique identifier of the game."
-            }
-          ]
-        }
+      "description": "Stores user profile information."
+    },
+    "/users/{userId}/games/{gameId}": {
+      "schema": {
+        "$ref": "#/entities/Game"
       },
-      {
-        "path": "/users/{userId}/templates/{templateId}",
-        "definition": {
-          "entityName": "Template",
-          "schema": {
-            "$ref": "#/backend/entities/Template"
-          },
-          "description": "Stores game templates created by a user. Path-based ownership ensures only the user can access their templates.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            },
-            {
-              "name": "templateId",
-              "description": "The unique identifier of the template."
-            }
-          ]
-        }
+      "description": "Stores game data created by a user."
+    },
+    "/users/{userId}/templates/{templateId}": {
+      "schema": {
+        "$ref": "#/entities/Template"
       },
-      {
-        "path": "/users/{userId}/uploads/{uploadId}",
-        "definition": {
-          "entityName": "Upload",
-          "schema": {
-            "$ref": "#/backend/entities/Upload"
-          },
-          "description": "Stores metadata about file uploads initiated by a user. Path-based ownership ensures only the user can access their upload metadata.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            },
-            {
-              "name": "uploadId",
-              "description": "The unique identifier of the upload."
-            }
-          ]
-        }
+      "description": "Stores game templates created by a user."
+    },
+    "/users/{userId}/uploads/{uploadId}": {
+      "schema": {
+        "$ref": "#/entities/Upload"
       },
-      {
-        "path": "/users/{userId}/downloadHistory/{downloadHistoryId}",
-        "definition": {
-          "entityName": "DownloadHistory",
-          "schema": {
-            "$ref": "#/backend/entities/DownloadHistory"
-          },
-          "description": "Stores the download history of games by users. Path-based ownership ensures only the user can access their download history.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            },
-            {
-              "name": "downloadHistoryId",
-              "description": "The unique identifier of the download history entry."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore data structure is designed to ensure security, scalability, and ease of debugging, in accordance with the defined principles. It prioritizes authorization independence by denormalizing authorization data to avoid costly and insecure `get()` calls in security rules. Path-based ownership is used where applicable, and membership maps are employed for collaborative access. Structural segregation is used to maintain homogeneous security postures within collections. The structure enables secure list operations via path-based ownership. \n\nSpecifically:\n\n*   User data is stored under `/users/{userId}`, enabling path-based ownership for private user data.\n*   Games, templates, uploads, and download history are stored within user-specific subcollections (e.g., `/users/{userId}/games/{gameId}`), leveraging path-based ownership. This ensures that only the user has access to their respective data without relying on `get()` calls to parent documents.\n\n*   This structure supports the required QAPs because List operations are secure since they are based on path-based ownership, and there are no rules acting as filters."
+      "description": "Stores metadata about file uploads initiated by a user."
+    },
+    "/users/{userId}/downloadHistory/{downloadHistoryId}": {
+      "schema": {
+        "$ref": "#/entities/DownloadHistory"
+      },
+      "description": "Stores the download history of games by users."
+    }
   }
 }

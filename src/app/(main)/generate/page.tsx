@@ -58,6 +58,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import sampleData from '@/lib/sample-results.json';
 import { suggestBetsFromHistory, type SuggestBetsFromHistoryOutput } from '@/ai/flows/suggest-bets-from-history';
 import { cn } from '@/lib/utils';
+import * as XLSX from 'xlsx';
 
 
 const formSchema = z.object({
@@ -124,25 +125,51 @@ function generateBet(mode: string, exclusionSet: Set<number> = new Set()): Bet {
 }
 
 /**
- * Recebe conteúdo de arquivo (CSV/TXT) e retorna array de arrays com 20 números sorteados de cada linha válida.
+ * Recebe o conteúdo de um arquivo Excel e retorna um array de arrays com os 20 números sorteados de cada linha válida.
  */
-function parseLotteryFile(fileContent: string): number[][] {
-  if (!fileContent || !fileContent.trim()) return [];
-  // separa por linhas
-  const lines = fileContent.split(/\r?\n/);
-  const results: number[][] = [];
-  for (const line of lines) {
-    // ignora linhas sem conteúdo suficiente
-    const parts = line.split(/[;,]/); // aceita ponto-e-vírgula ou vírgula
-    if (parts.length < 22) continue;
-    // pega os 20 números após concurso/data
-    const contestNumbers = parts.slice(2, 22).map(n => parseInt(n.trim(), 10));
-    if (contestNumbers.length === 20 && contestNumbers.every(n => !isNaN(n) && n >= 0 && n <= 99)) {
-      results.push(contestNumbers);
-    }
-  }
-  return results;
+async function parseLotteryFile(file: File): Promise<number[][]> {
+    const reader = new FileReader();
+    return new Promise((resolve, reject) => {
+        reader.onerror = () => {
+            reader.abort();
+            reject(new Error("Não foi possível ler o arquivo."));
+        };
+
+        reader.onload = (event) => {
+            try {
+                const data = event.target?.result;
+                if (!data) {
+                    resolve([]);
+                    return;
+                }
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json: (string | number)[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                const results: number[][] = [];
+                // Começa a partir da segunda linha para ignorar o cabeçalho
+                for (let i = 1; i < json.length; i++) {
+                    const row = json[i];
+                    // Pega os 20 números das colunas C até V (índices 2 a 21)
+                    if (row.length >= 22) {
+                        const contestNumbers = row.slice(2, 22).map(n => parseInt(String(n), 10));
+                        if (contestNumbers.length === 20 && contestNumbers.every(n => !isNaN(n) && n >= 0 && n <= 99)) {
+                            results.push(contestNumbers);
+                        }
+                    }
+                }
+                resolve(results);
+            } catch (e) {
+                console.error("Erro ao processar o arquivo XLSX:", e);
+                resolve([]); // Retorna array vazio em caso de erro de parsing
+            }
+        };
+
+        reader.readAsArrayBuffer(file);
+    });
 }
+
 
 
 // Helper to format bets into a string
@@ -230,7 +257,7 @@ const generationModeDescriptions: Record<string, string> = {
 const dataSourceDescriptions: Record<string, string> = {
     padrao: 'Gere apostas usando métodos simples como aleatório puro, completar ou excluir números manualmente.',
     historico: 'A IA analisa nosso histórico de concursos para sugerir apostas com base em estratégias de números quentes, frios ou um mix.',
-    arquivo: 'Faça upload de um arquivo de resultados (CSV/TXT). A IA irá analisá-lo e gerar novas apostas com base na estratégia que você escolher.'
+    arquivo: 'Faça upload de um arquivo de resultados (CSV/TXT/XLSX). A IA irá analisá-lo e gerar novas apostas com base na estratégia que você escolher.'
 }
 
 
@@ -352,8 +379,7 @@ export default function GeneratePage() {
             }
             toast({ title: 'Lendo seu arquivo...', description: 'Extraindo os números para análise.' });
             
-            const fileContent = await selectedFile.text();
-            const parsedResult = parseLotteryFile(fileContent);
+            const parsedResult = await parseLotteryFile(selectedFile);
 
             if (parsedResult.length === 0) {
                  toast({
@@ -715,7 +741,7 @@ export default function GeneratePage() {
                           ref={fileInputRef}
                           onChange={handleFileChange}
                           className="hidden"
-                          accept=".csv, .txt"
+                          accept=".csv, .txt, .xlsx"
                         />
                         <Button type="button" variant="outline" onClick={handleUploadClick} className="w-full sm:w-auto">
                           <Upload className="mr-2 h-4 w-4" />

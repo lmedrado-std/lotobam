@@ -666,11 +666,11 @@ export default function GeneratePage() {
                           ref={fileInputRef}
                           onChange={handleFileChange}
                           className="hidden"
-                          accept=".csv, .txt"
+                          accept=".xlsx, .csv, .txt"
                         />
                         <Button type="button" variant="outline" onClick={handleUploadClick} className="w-full sm:w-auto">
                           <Upload className="mr-2 h-4 w-4" />
-                          Localizar Arquivo
+                          Localizar Arquivo XLSX
                         </Button>
                         {selectedFile && (
                           <div className="flex items-center rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
@@ -821,4 +821,5 @@ export default function GeneratePage() {
     
 
     
+
 

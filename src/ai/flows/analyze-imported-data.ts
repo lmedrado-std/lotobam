@@ -34,26 +34,37 @@ const prompt = ai.definePrompt({
   output: { schema: AnalyzeImportedDataOutputSchema },
   prompt: `You are a data extraction expert. Your task is to parse the provided text content, which comes from a lottery results file (CSV or TXT format).
 
-  The file has header rows that should be ignored. The relevant data starts after a header row containing "Concurso", "Data", "bola 1", etc.
+  The file may contain header rows, titles, or empty lines that should be completely ignored. The relevant data rows are the ones that contain the lottery numbers.
 
-  For each valid row, you must extract the 20 drawn numbers (from "bola 1" to "bola 20"). Ignore the "Concurso" and "Data" columns.
+  For each valid row containing lottery numbers, you must extract all 20 drawn numbers (from "bola 1" to "bola 20"). Ignore all other columns like "Concurso" and "Data".
 
-  Return a single JSON object with a "results" key. The value of "results" should be an array of arrays, where each inner array contains the 20 numbers for one lottery contest.
+  Return a single, valid JSON object with a "results" key. The value of "results" must be an array of arrays, where each inner array contains the 20 numbers for one lottery contest. Do not include any text or explanations outside of the JSON object.
 
   Example Input Snippet:
-  ...
-  Concurso;Data;bola 1;bola 2;...
-  2846;07/11/2025;42;33;...
-  2845;05/11/2025;53;69;...
-  ...
+  "LOTOMANIA - CONCURSOS E RESULTADOS
+  Concurso;Data;bola 1;bola 2;...;bola 20
+  2846;07/11/2025;42;33;...;12
+  2845;05/11/2025;53;69;...;88
 
-  Example Output:
+  "
+
+  Example of a valid row to parse:
+  "2845;05/11/2025;53;69;01;02;03;04;05;06;07;08;09;10;11;12;13;14;15;16;17;88"
+
+  Correctly Extracted Numbers from that row:
+  [53, 69, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 88]
+
+  Example Final JSON Output:
   {
     "results": [
       [42, 33, ...],
       [53, 69, ...]
     ]
   }
+
+  If the file is empty or contains no valid number rows, return an empty array for "results".
+
+  CRITICAL: You must return ONLY the JSON object and nothing else.
 
   File Content to Parse:
   {{{fileContent}}}
@@ -71,4 +82,5 @@ const analyzeImportedDataFlow = ai.defineFlow(
     return output!;
   }
 );
+
 

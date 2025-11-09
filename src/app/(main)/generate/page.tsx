@@ -62,8 +62,8 @@ import { useFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import sampleData from '@/lib/sample-results.json';
-import { suggestBetsFromHistory } from '@/ai/flows/suggest-bets-from-history';
-import { analyzeImportedData } from '@/ai/flows/analyze-imported-data';
+import { suggestBetsFromHistory, type SuggestBetsFromHistoryOutput } from '@/ai/flows/suggest-bets-from-history';
+import { analyzeImportedData, type AnalyzeImportedDataOutput } from '@/ai/flows/analyze-imported-data';
 import { cn } from '@/lib/utils';
 
 
@@ -95,6 +95,7 @@ const templateFormSchema = z.object({
 
 const fileImportSchema = z.object({
   aiFileStrategy: z.string(),
+  avoidNumbersFile: z.string().optional(),
 });
 
 
@@ -300,6 +301,7 @@ export default function GeneratePage() {
     resolver: zodResolver(fileImportSchema),
     defaultValues: {
       aiFileStrategy: 'balanced',
+      avoidNumbersFile: '',
     },
   });
 
@@ -330,27 +332,63 @@ export default function GeneratePage() {
         });
 
         const extractionResponse = await analyzeImportedData({ fileContent });
-        const stats = getNumberStatsFromResultsArray(extractionResponse.results);
+        
+        if (!extractionResponse || !extractionResponse.results) {
+          throw new Error("A resposta da IA não contém os resultados esperados.");
+        }
+        
+        const existingBets = extractionResponse.results;
+        const stats = getNumberStatsFromResultsArray(existingBets);
 
         const { quantity } = form.getValues();
-        const { aiFileStrategy } = fileImportForm.getValues();
+        const { aiFileStrategy, avoidNumbersFile } = fileImportForm.getValues();
+        
+        const manualExclusionSet = parseManualNumbers(avoidNumbersFile);
 
         toast({
           title: 'Analisando e gerando apostas...',
           description: `Usando a estratégia "${aiFileStrategy}" com base nos dados do arquivo.`,
         });
 
-        const suggestionResponse = await suggestBetsFromHistory({
-            stats,
-            strategy: aiFileStrategy,
-            numberOfBets: quantity,
-        });
+        let allSuggestions: SuggestBetsFromHistoryOutput['suggestions'] = [];
+        let attempts = 0;
+        const maxAttempts = 5; 
+        const existingBetsSet = new Set(existingBets.map(b => JSON.stringify(b.sort(lottoSort))));
 
-        setGeneratedBets(suggestionResponse.suggestions.map(bet => bet.sort(lottoSort)));
+        while (allSuggestions.length < quantity && attempts < maxAttempts) {
+          const needed = quantity - allSuggestions.length;
+          const response = await suggestBetsFromHistory({
+              stats,
+              strategy: aiFileStrategy,
+              numberOfBets: needed,
+              manualExclusion: Array.from(manualExclusionSet),
+          });
+          
+          const newUniqueSuggestions = response.suggestions.filter(suggestion => {
+              const sortedSuggestion = suggestion.sort(lottoSort);
+              const suggestionKey = JSON.stringify(sortedSuggestion);
+              return !existingBetsSet.has(suggestionKey);
+          });
+
+          allSuggestions.push(...newUniqueSuggestions);
+          attempts++;
+        }
+
+        if (allSuggestions.length < quantity) {
+          toast({
+            variant: 'destructive',
+            title: 'Não foi possível gerar jogos inéditos',
+            description: `A IA tentou, mas não conseguiu criar ${quantity} jogos que já não estivessem no seu arquivo. Foram gerados ${allSuggestions.length} jogos.`,
+          })
+        }
+
+        setGeneratedBets(allSuggestions.slice(0, quantity).map(bet => bet.sort(lottoSort)));
+        
         toast({
           title: 'Apostas geradas com base no arquivo!',
-          description: suggestionResponse.analysis,
+          description: `Análise concluída. ${allSuggestions.length} novas apostas foram criadas.`,
         })
+
     } catch (error) {
         console.error("File-based AI generation failed:", error);
         toast({
@@ -381,6 +419,7 @@ export default function GeneratePage() {
           stats,
           strategy: data.aiStrategy || 'balanced',
           numberOfBets: data.quantity,
+          manualExclusion: [],
         });
         setGeneratedBets(response.suggestions.map(bet => bet.sort(lottoSort)));
       } catch (error) {
@@ -831,12 +870,15 @@ export default function GeneratePage() {
           {selectedFile && (
             <Form {...fileImportForm}>
               <form onSubmit={(e) => { e.preventDefault(); generateBetsWithFile(); }} className="space-y-6">
-                <FormField
+                 <FormField
                   control={fileImportForm.control}
                   name="aiFileStrategy"
                   render={({ field }) => (
                     <FormItem className="space-y-3">
                       <FormLabel>Estratégia da IA (Base: Arquivo)</FormLabel>
+                       <FormDescription>
+                        A IA irá analisar as estatísticas do seu arquivo para gerar as apostas e garantirá que os jogos gerados sejam diferentes dos que já existem no arquivo.
+                      </FormDescription>
                       <FormControl>
                         <RadioGroup
                           onValueChange={field.onChange}
@@ -869,13 +911,32 @@ export default function GeneratePage() {
                           </FormItem>
                         </RadioGroup>
                       </FormControl>
+                     
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={fileImportForm.control}
+                  name="avoidNumbersFile"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Números para Evitar (Opcional)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Digite números para a IA ignorar. Ex: 7 15 33"
+                          {...field}
+                        />
+                      </FormControl>
                       <FormDescription>
-                        A IA irá analisar as estatísticas do seu arquivo para gerar as apostas.
+                        A IA não usará esses números ao gerar as apostas, mesmo que sejam estatisticamente relevantes no arquivo.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
                 <Button type="submit" disabled={isGenerating}>
                     <Sparkles className="mr-2 h-4 w-4" />
                     {isGenerating ? 'Analisando...' : 'Analisar Arquivo e Gerar com IA'}

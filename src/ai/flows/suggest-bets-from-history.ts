@@ -26,6 +26,7 @@ const SuggestBetsFromHistoryInputSchema = z.object({
   numberOfBets: z
     .number()
     .describe('The number of bet combinations to suggest.'),
+  manualExclusion: z.array(z.number()).describe('An optional list of numbers to manually exclude from suggestions.'),
 });
 export type SuggestBetsFromHistoryInput = z.infer<typeof SuggestBetsFromHistoryInputSchema>;
 
@@ -56,6 +57,7 @@ const prompt = ai.definePrompt({
   User's Request:
   - Strategy: {{strategy}}
   - Number of Bets to Generate: {{numberOfBets}}
+  - Numbers to Manually Exclude: {{#if manualExclusion}}{{manualExclusion}}{{else}}None{{/if}}
 
   Your Task:
   1.  Generate {{numberOfBets}} new bet suggestions based on the chosen strategy:
@@ -66,9 +68,11 @@ const prompt = ai.definePrompt({
   2.  Each bet MUST contain exactly 50 unique numbers.
       - The numbers must be between 0 and 99 (inclusive).
 
-  3.  Provide a brief analysis explaining your choices. For example, mention a few hot or cold numbers you used and how you incorporated the strategy.
+  3.  You MUST NOT use any of the numbers from the "Numbers to Manually Exclude" list in your suggestions.
 
-  4.  Return the response in a valid JSON object with the keys "suggestions" (an array of number arrays) and "analysis" (a string). Ensure the JSON is well-formed.
+  4.  Provide a brief analysis explaining your choices. For example, mention a few hot or cold numbers you used and how you incorporated the strategy.
+
+  5.  Return the response in a valid JSON object with the keys "suggestions" (an array of number arrays) and "analysis" (a string). Ensure the JSON is well-formed.
   `,
 });
 
@@ -84,5 +88,3 @@ const suggestBetsFromHistoryFlow = ai.defineFlow(
     return output!;
   }
 );
-
-    

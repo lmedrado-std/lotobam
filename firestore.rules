@@ -1,31 +1,54 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Users root — leitura pública mínima
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
+    // Jogos do usuário
     match /users/{userId}/games/{gameId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null && request.auth.uid == userId && isValidGame(request.resource.data);
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
     }
 
+    // Templates do usuário - templates públicos podem ser lidos por todos
     match /users/{userId}/templates/{templateId} {
-      allow create: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId && isValidTemplate(request.resource.data);
+      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid && isValidTemplate(request.resource.data);
       allow read: if request.auth != null && request.auth.uid == userId;
-      allow update, delete: if request.auth.uid == resource.data.ownerId;
     }
 
-    // Public templates can be read by anyone
+    // Templates compartilháveis
     match /templates/{templateId} {
       allow read: if resource.data.public == true;
     }
 
+    // Uploads do usuário
     match /users/{userId}/uploads/{uploadId} {
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.ownerId;
+    }
+
+    // Histórico de downloads do usuário
+    match /users/{userId}/downloadHistory/{downloadHistoryId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    match /users/{userId}/downloadHistory/{downloadHistoryId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    // Utility functions
+    function isValidGame(data) {
+      return data.keys().hasAll(['ownerId','numbers','criteria','source','createdAt']) 
+        && data.ownerId is string
+        && data.numbers is list
+        && data.numbers.size() > 0
+        && data.numbers.size() <= 10000 // arbitrary cap
+        && data.numbers[0] is list; // ensure nested lists
+        // Validação mais profunda dos números deve ser feita no lado do servidor/função
+    }
+
+    function isValidTemplate(data) {
+      return data.ownerId is string && data.name is string && data.criteria is map;
     }
   }
 }

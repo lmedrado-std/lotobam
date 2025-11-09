@@ -57,6 +57,9 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
+import { useFirebase } from '@/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+
 
 const formSchema = z.object({
   mode: z.string({
@@ -108,11 +111,44 @@ function generateBet(mode: string, manualNumbers: Set<number>): Bet {
   return Array.from(bet).sort((a, b) => a - b);
 }
 
+// Helper to format bets into a string
+const formatBets = (bets: Bet[], format: 'csv' | 'json' | 'txt'): string => {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  
+  if (format === 'json') {
+    return JSON.stringify(bets.map((bet, i) => ({ id: i + 1, numbers: bet })), null, 2);
+  }
+  
+  if (format === 'csv') {
+    const header = Array.from({ length: 50 }, (_, i) => `num${i + 1}`).join(',');
+    const rows = bets.map(bet => bet.map(pad).join(','));
+    return `id,${header}\n${rows.map((row, i) => `${i + 1},${row}`).join('\n')}`;
+  }
+
+  // txt format
+  return bets.map(bet => bet.map(pad).join(' ')).join('\n');
+};
+
+// Helper to trigger file download
+const downloadFile = (content: string, fileName: string, contentType: string) => {
+  const blob = new Blob([content], { type: contentType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+
 export default function GeneratePage() {
   const [generatedBets, setGeneratedBets] = useState<Bet[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaveTemplateModalOpen, setSaveTemplateModalOpen] = useState(false);
   const { toast } = useToast();
+  const { firestore, user, isUserLoading } = useFirebase();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -167,30 +203,81 @@ export default function GeneratePage() {
   }
 
   function handleExport(format: 'csv' | 'json' | 'txt') {
-    // Mock export logic
+    if (generatedBets.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Nenhuma aposta para exportar',
+        description: 'Gere algumas apostas antes de exportar.',
+      });
+      return;
+    }
+    
+    const fileMap = {
+      csv: { extension: 'csv', contentType: 'text/csv' },
+      json: { extension: 'json', contentType: 'application/json' },
+      txt: { extension: 'txt', contentType: 'text/plain' },
+    };
+
+    const { extension, contentType } = fileMap[format];
+    const fileContent = formatBets(generatedBets, format);
+    downloadFile(fileContent, `lotomania-apostas-${Date.now()}.${extension}`, contentType);
+
     toast({
-      title: 'Exportação iniciada',
-      description: `Seu arquivo no formato ${format.toUpperCase()} está sendo preparado.`,
+      title: 'Exportação Concluída',
+      description: `Seu arquivo no formato ${format.toUpperCase()} foi baixado.`,
     });
-    console.log(`Exporting ${generatedBets.length} bets in ${format} format.`);
   }
 
-  function handleSaveTemplate(values: z.infer<typeof templateFormSchema>) {
+  async function handleSaveTemplate(values: z.infer<typeof templateFormSchema>) {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Usuário não autenticado",
+        description: "Você precisa estar logado para salvar um modelo.",
+      });
+      return;
+    }
+
     const generationCriteria = form.getValues();
     
-    // Mock save logic. We will connect to Firestore later.
-    console.log('Saving template:', {
-      templateDetails: values,
-      generationCriteria,
-    });
-    
-    toast({
-      title: 'Modelo salvo!',
-      description: `O modelo "${values.name}" foi salvo com sucesso.`,
-    });
+    try {
+      const templatesCollection = collection(firestore, `users/${user.uid}/templates`);
+      await addDoc(templatesCollection, {
+        ownerId: user.uid,
+        name: values.name,
+        description: values.description,
+        criteria: generationCriteria,
+        createdAt: serverTimestamp(),
+      });
 
-    setSaveTemplateModalOpen(false);
-    templateForm.reset();
+      toast({
+        title: 'Modelo salvo!',
+        description: `O modelo "${values.name}" foi salvo com sucesso.`,
+      });
+
+      setSaveTemplateModalOpen(false);
+      templateForm.reset();
+
+    } catch (error) {
+      console.error("Error saving template: ", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao salvar",
+        description: "Não foi possível salvar o modelo. Tente novamente mais tarde.",
+      });
+    }
+  }
+  
+  const handleOpenSaveModal = () => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Faça login para salvar",
+        description: "Apenas usuários autenticados podem salvar modelos.",
+      });
+      return;
+    }
+    setSaveTemplateModalOpen(true);
   }
 
   return (
@@ -316,7 +403,7 @@ export default function GeneratePage() {
                 </CardDescription>
                </div>
                <div className="flex gap-2">
-                 <Button variant="outline" onClick={() => setSaveTemplateModalOpen(true)}>
+                 <Button variant="outline" onClick={handleOpenSaveModal} disabled={isUserLoading}>
                    <Bookmark className="mr-2 h-4 w-4"/> Salvar como Modelo
                  </Button>
                   <DropdownMenu>

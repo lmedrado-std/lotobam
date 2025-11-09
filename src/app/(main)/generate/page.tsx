@@ -102,6 +102,14 @@ function parseManualNumbers(numbersStr: string | undefined): Set<number> {
   return new Set(validNumbers);
 }
 
+// Custom sort function to place 0 at the end
+function lottoSort(a: number, b: number): number {
+    if (a === 0) return 1;
+    if (b === 0) return -1;
+    return a - b;
+}
+
+
 function generateBet(mode: string, exclusionSet: Set<number> = new Set()): Bet {
   let bet: Set<number> = new Set();
   
@@ -117,7 +125,7 @@ function generateBet(mode: string, exclusionSet: Set<number> = new Set()): Bet {
       bet.add(randomNumber);
     }
   }
-  return Array.from(bet).sort((a, b) => a - b);
+  return Array.from(bet).sort(lottoSort);
 }
 
 
@@ -220,7 +228,7 @@ export default function GeneratePage() {
             numberOfBets: quantity,
         });
 
-        setGeneratedBets(response.suggestions);
+        setGeneratedBets(response.suggestions.map(bet => bet.sort(lottoSort)));
         toast({
           title: 'Apostas geradas com base no arquivo!',
           description: response.analysis,
@@ -253,7 +261,7 @@ export default function GeneratePage() {
           strategy: data.aiStrategy || 'balanced',
           numberOfBets: data.quantity,
         });
-        setGeneratedBets(response.suggestions);
+        setGeneratedBets(response.suggestions.map(bet => bet.sort(lottoSort)));
       } catch (error) {
         console.error("AI generation failed:", error);
         toast({
@@ -307,7 +315,7 @@ export default function GeneratePage() {
           title: "Muitos números inseridos",
           description: "Você inseriu 50 ou mais números. Não é necessário completar.",
         });
-        const singleBet = Array.from(exclusionSet).slice(0, 50).sort((a, b) => a - b);
+        const singleBet = Array.from(exclusionSet).slice(0, 50).sort(lottoSort);
         setGeneratedBets([singleBet]);
         setIsGenerating(false);
         return;
@@ -321,7 +329,7 @@ export default function GeneratePage() {
             bet.add(randomNumber);
           }
         }
-        return Array.from(bet).sort((a,b) => a-b);
+        return Array.from(bet).sort(lottoSort);
       });
       setGeneratedBets(completedBets);
       setIsGenerating(false);

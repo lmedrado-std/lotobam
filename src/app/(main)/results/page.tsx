@@ -105,13 +105,11 @@ export default function ResultsPage() {
   const [dataSource, setDataSource] = useState<'sample' | 'file'>('sample');
 
   useEffect(() => {
+    // This effect runs only on the client-side
     setIsLoading(true);
     let initialResults: LottoResult[] = [];
     let initialDataSource: 'sample' | 'file' = 'sample';
-    let toastMessage = {
-        title: 'Resultados de Exemplo Carregados',
-        description: 'O histórico de concursos padrão foi carregado.',
-    };
+    let toastMessage: { title: string, description: string } | null = null;
 
     try {
         const storedResults = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -134,12 +132,22 @@ export default function ResultsPage() {
     
     if (initialResults.length === 0) {
         initialResults = [...sampleData.results].sort((a, b) => b.concurso - a.concurso);
+        initialDataSource = 'sample';
+         // Only show toast for sample data if no stored data was found
+         if (!toastMessage) {
+            toastMessage = {
+                title: 'Resultados de Exemplo Carregados',
+                description: 'O histórico de concursos padrão foi carregado.',
+            };
+        }
     }
 
     updateResultsAndFilters(initialResults);
     setDataSource(initialDataSource);
     setIsLoading(false);
-    toast(toastMessage);
+    if (toastMessage) {
+        toast(toastMessage);
+    }
 
   }, [toast]);
 

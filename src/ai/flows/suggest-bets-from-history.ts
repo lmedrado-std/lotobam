@@ -67,7 +67,6 @@ const prompt = ai.definePrompt({
       - "cold": Prioritize the "cold" numbers provided.
       - "balanced": Create a mix of hot and cold numbers, and also include some numbers from the mid-range of frequency.
       - "unseen": Prioritize numbers that are NOT in the hot or cold lists. These are numbers that haven't been drawn much, or at all, in the provided dataset.
-      - "unseen_bets": Generate bets that are completely different from the ones provided in the source data.
 
   2.  Each bet MUST contain exactly 50 unique numbers.
       - The numbers must be between 0 and 99 (inclusive).
@@ -102,6 +101,3 @@ const suggestBetsFromHistoryFlow = ai.defineFlow(
     return output!;
   }
 );
-
-
-

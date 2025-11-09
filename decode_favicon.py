@@ -1,0 +1,10 @@
+
+import base64
+
+favicon_data_base64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQEAYAAABPYyMiAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAA9UExURf////3+/dDj2dvp5vP29t3r5/v8+zOQyvT39zOUyzWUyzOUyzOUyzOUyzOUyzOUyzOUyzOUyj6TzAAAABF0Uk5TAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/////v8/pdVvAAAAAKNJREFUeNp8zlEKgDAAwDA3sHeA4u7u/f8XJ3QCaJ25+4/xATz2MOGcE23jGAsY/8+gMeFrMyQeMP43pG/Yw3cEJiicWkQ4mnA6kUDiC2H2Ezgk6RBEiZ4mFhGSSx2Xg2+b6FhH5yJ3oHw/s2cDRivxqrR0sTq7bQ3G47XoA6kljOrrvJg7M/gdoamfJ+dOq/6l//F06dDbwIMADoF3k/27k7oAAAAAElFTkSuQmCC'
+favicon_data = base64.b64decode(favicon_data_base64)
+
+with open('src/app/favicon.ico', 'wb') as f:
+    f.write(favicon_data)
+
+print("Favicon decoded and saved successfully.")

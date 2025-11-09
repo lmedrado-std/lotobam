@@ -320,7 +320,13 @@ export default function GeneratePage() {
 
         } else if (data.dataSource === 'arquivo') {
             if (!selectedFile) {
-                throw new Error('Por favor, selecione um arquivo para usar como base.');
+                toast({
+                    variant: "destructive",
+                    title: "Nenhum arquivo selecionado",
+                    description: "Por favor, selecione um arquivo para usar como base.",
+                });
+                setIsGenerating(false);
+                return;
             }
             toast({ title: 'Lendo seu arquivo...', description: 'Extraindo os números para análise da IA.' });
             const fileContent = await selectedFile.text();
@@ -816,5 +822,7 @@ export default function GeneratePage() {
   );
 }
 
+
+    
 
     

@@ -20,9 +20,10 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Download } from 'lucide-react';
 import sampleData from '@/lib/sample-results.json';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 type LottoResult = {
   concurso: number;
@@ -85,6 +86,23 @@ export default function ResultsPage() {
         </p>
       </div>
       
+      <Card>
+        <CardHeader>
+          <CardTitle>Atualizar Base de Resultados</CardTitle>
+           <CardDescription>
+            Mantenha sua base de análise sempre atualizada. Baixe a planilha com todos os resultados da Lotomania e use-a na seção "Gerar com Base em Arquivo" na página de geração.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Button asChild>
+                <Link href="https://asloterias.com.br/download-todos-resultados-lotomania" target="_blank" rel="noopener noreferrer">
+                    <Download className="mr-2 h-4 w-4" />
+                    Baixar Planilha de Resultados
+                </Link>
+            </Button>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Filtrar por Ano</CardTitle>

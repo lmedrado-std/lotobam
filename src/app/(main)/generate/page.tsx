@@ -795,7 +795,7 @@ export default function GeneratePage() {
       <Card>
         <CardHeader>
           <CardTitle>Gerar com Base em Arquivo</CardTitle>
-          <CardDescription>Faça upload de um arquivo (.txt, .csv) com seus próprios jogos ou números. A IA irá analisá-lo e gerar novas apostas com base na estratégia que você escolher.</CardDescription>
+          <CardDescription>Faça upload de um arquivo de resultados (como a planilha que você baixou) ou um arquivo com suas próprias apostas. A IA irá analisá-lo e gerar novas apostas com base na estratégia que você escolher.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 sm:flex-row">
@@ -993,4 +993,3 @@ export default function GeneratePage() {
     </div>
   );
 }
-

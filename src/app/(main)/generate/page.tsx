@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import {
   Table,
@@ -40,6 +40,8 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Bookmark, Download, Sparkles, Trash2 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
   mode: z.string({
@@ -49,14 +51,38 @@ const formSchema = z.object({
     .number()
     .min(1, { message: 'A quantidade deve ser no mínimo 1.' })
     .max(100, { message: 'A quantidade não pode ser maior que 100.' }),
+  manualNumbers: z.string().optional(),
+}).refine(data => {
+  if (data.mode === 'completar_manual') {
+    return !!data.manualNumbers && data.manualNumbers.trim() !== '';
+  }
+  return true;
+}, {
+  message: 'Por favor, insira os números que deseja fixar.',
+  path: ['manualNumbers'],
 });
 
 type Bet = number[];
 
-function generateRandomBet(): Bet {
-  const bet: Set<number> = new Set();
+function parseManualNumbers(numbersStr: string | undefined): Set<number> {
+  if (!numbersStr) return new Set();
+  const numbers = numbersStr.split(/[\s,]+/).filter(Boolean).map(n => parseInt(n, 10));
+  const validNumbers = numbers.filter(n => !isNaN(n) && n >= 0 && n <= 99);
+  return new Set(validNumbers);
+}
+
+function generateBet(mode: string, manualNumbers: Set<number>): Bet {
+  const bet: Set<number> = mode === 'completar_manual' ? new Set(manualNumbers) : new Set();
+  
+  if (bet.size >= 50) {
+    return Array.from(bet).slice(0, 50).sort((a, b) => a - b);
+  }
+
   while (bet.size < 50) {
-    bet.add(Math.floor(Math.random() * 100));
+    const randomNumber = Math.floor(Math.random() * 100);
+    if (!bet.has(randomNumber)) {
+      bet.add(randomNumber);
+    }
   }
   return Array.from(bet).sort((a, b) => a - b);
 }
@@ -64,22 +90,43 @@ function generateRandomBet(): Bet {
 export default function GeneratePage() {
   const [generatedBets, setGeneratedBets] = useState<Bet[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       quantity: 10,
       mode: 'aleatorio',
+      manualNumbers: '',
     },
+  });
+
+  const selectedMode = useWatch({
+    control: form.control,
+    name: 'mode',
   });
 
   function onSubmit(data: z.infer<typeof formSchema>) {
     setIsGenerating(true);
     setGeneratedBets([]);
+
+    const manualNumbersSet = parseManualNumbers(data.manualNumbers);
+
+    if (data.mode === 'completar_manual' && manualNumbersSet.size >= 50) {
+      toast({
+        variant: "destructive",
+        title: "Muitos números inseridos",
+        description: "Você inseriu 50 ou mais números. Não é necessário completar.",
+      });
+      const singleBet = Array.from(manualNumbersSet).slice(0, 50).sort((a,b) => a - b);
+      setGeneratedBets([singleBet]);
+      setIsGenerating(false);
+      return;
+    }
     
     // Simulating generation delay
     setTimeout(() => {
-      const bets = Array.from({ length: data.quantity }, generateRandomBet);
+      const bets = Array.from({ length: data.quantity }, () => generateBet(data.mode, manualNumbersSet));
       setGeneratedBets(bets);
       setIsGenerating(false);
     }, 1000);
@@ -130,6 +177,7 @@ export default function GeneratePage() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="aleatorio">Aleatório Puro</SelectItem>
+                        <SelectItem value="completar_manual">Completar Números</SelectItem>
                         <SelectItem value="balanceado" disabled>Balanceado por Faixa (em breve)</SelectItem>
                         <SelectItem value="soma_alvo" disabled>Soma Alvo (em breve)</SelectItem>
                         <SelectItem value="hot_cold" disabled>Hot/Cold (em breve)</SelectItem>
@@ -166,6 +214,28 @@ export default function GeneratePage() {
                   {isGenerating ? 'Gerando...' : 'Gerar Apostas'}
                 </Button>
               </div>
+
+              {selectedMode === 'completar_manual' && (
+                <FormField
+                  control={form.control}
+                  name="manualNumbers"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-3">
+                      <FormLabel>Números para Completar</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Digite os números separados por espaço ou vírgula. Ex: 5 12 23 45 88"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        O sistema usará esses números e gerará o restante aleatoriamente até completar 50.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </form>
           </Form>
         </CardContent>

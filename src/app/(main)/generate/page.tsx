@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -60,6 +60,9 @@ import {
 } from '@/components/ui/dialog';
 import { useFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import sampleData from '@/lib/sample-results.json';
+import { suggestBetsFromHistory } from '@/ai/flows/suggest-bets-from-history';
 
 
 const formSchema = z.object({
@@ -71,6 +74,7 @@ const formSchema = z.object({
     .min(1, { message: 'A quantidade deve ser no mínimo 1.' })
     .max(100, { message: 'A quantidade não pode ser maior que 100.' }),
   manualNumbers: z.string().optional(),
+  aiStrategy: z.string().optional(),
 }).refine(data => {
   if (data.mode === 'completar_manual' || data.mode === 'excluir_numeros') {
     return !!data.manualNumbers && data.manualNumbers.trim() !== '';
@@ -161,6 +165,12 @@ export default function GeneratePage() {
 
   const { toast } = useToast();
   const { firestore, user, isUserLoading } = useFirebase();
+  const [resultsHistory, setResultsHistory] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Load results on component mount
+    setResultsHistory(sampleData.results);
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -168,6 +178,7 @@ export default function GeneratePage() {
       quantity: 10,
       mode: 'aleatorio',
       manualNumbers: '',
+      aiStrategy: 'balanced',
     },
   });
   
@@ -184,9 +195,35 @@ export default function GeneratePage() {
     name: 'mode',
   });
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
+  async function onSubmit(data: z.infer<typeof formSchema>) {
     setIsGenerating(true);
     setGeneratedBets([]);
+
+    if (data.mode === 'ai_strategy') {
+      try {
+        toast({
+          title: 'A IA está pensando...',
+          description: 'Analisando o histórico de resultados para criar as melhores apostas.',
+        });
+        const response = await suggestBetsFromHistory({
+          history: resultsHistory,
+          strategy: data.aiStrategy || 'balanced',
+          numberOfBets: data.quantity,
+        });
+        setGeneratedBets(response.suggestions);
+      } catch (error) {
+        console.error("AI generation failed:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro da IA",
+          description: "Não foi possível gerar apostas com a IA. Tente novamente.",
+        });
+      } finally {
+        setIsGenerating(false);
+      }
+      return;
+    }
+
 
     const manualNumbersSet = parseManualNumbers(data.manualNumbers);
 
@@ -212,12 +249,12 @@ export default function GeneratePage() {
       return;
     }
 
-    // Simulating generation delay
+    // Simulating generation delay for non-AI modes
     setTimeout(() => {
       const bets = Array.from({ length: data.quantity }, () => generateBet(data.mode, manualNumbersSet));
       setGeneratedBets(bets);
       setIsGenerating(false);
-    }, 1000);
+    }, 500);
   }
 
   function handleClear() {
@@ -388,6 +425,7 @@ export default function GeneratePage() {
                         <SelectItem value="aleatorio">Aleatório Puro</SelectItem>
                         <SelectItem value="completar_manual">Completar Números</SelectItem>
                         <SelectItem value="excluir_numeros">Excluir Números</SelectItem>
+                        <SelectItem value="ai_strategy">Inteligência Artificial (Beta)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
@@ -415,12 +453,62 @@ export default function GeneratePage() {
                 )}
               />
 
-              <div className="md:col-start-3 md:flex md:items-end md:justify-end">
-                <Button type="submit" disabled={isGenerating}>
+              <div className="md:flex md:items-end md:justify-end md:col-start-3">
+                <Button type="submit" disabled={isGenerating} className="w-full md:w-auto">
                   <Sparkles className="mr-2 h-4 w-4" />
                   {isGenerating ? 'Gerando...' : 'Gerar Apostas'}
                 </Button>
               </div>
+
+              {selectedMode === 'ai_strategy' && (
+                <div className="md:col-span-3">
+                  <FormField
+                    control={form.control}
+                    name="aiStrategy"
+                    render={({ field }) => (
+                      <FormItem className="space-y-3">
+                        <FormLabel>Estratégia da IA</FormLabel>
+                        <FormControl>
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            className="flex flex-col space-y-1"
+                          >
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <RadioGroupItem value="hot" />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                Números Quentes (Mais Frequentes)
+                              </FormLabel>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <RadioGroupItem value="cold" />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                Números Frios (Menos Frequentes)
+                              </FormLabel>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <RadioGroupItem value="balanced" />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                Balanceado (Mix de Quentes e Frios)
+                              </FormLabel>
+                            </FormItem>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormDescription>
+                          A IA usará o histórico de resultados para seguir a estratégia escolhida.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
 
               {(selectedMode === 'completar_manual' || selectedMode === 'excluir_numeros') && (
                 <FormField

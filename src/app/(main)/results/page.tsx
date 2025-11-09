@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -33,6 +33,11 @@ export default function ResultsPage() {
   const [results, setResults] = useState<LottoResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Load results on component mount
+  useEffect(() => {
+    handleUpdateResults();
+  }, []);
+
   const handleUpdateResults = () => {
     setIsLoading(true);
     // Simulates a network request to fetch results
@@ -40,8 +45,8 @@ export default function ResultsPage() {
       setResults(sampleData.results);
       setIsLoading(false);
       toast({
-        title: 'Resultados Atualizados',
-        description: 'A base de dados foi atualizada com os últimos concursos.',
+        title: 'Resultados Carregados',
+        description: 'O histórico de concursos foi carregado.',
       });
     }, 1000);
   };
@@ -78,7 +83,7 @@ export default function ResultsPage() {
         </CardHeader>
         <CardContent>
           {results.length > 0 ? (
-            <div className="relative max-h-96 overflow-auto">
+            <div className="relative max-h-[600px] overflow-auto">
               <Table>
                 <TableHeader className="sticky top-0 bg-card">
                   <TableRow>
@@ -114,9 +119,13 @@ export default function ResultsPage() {
             </div>
           ) : (
             <div className="flex h-64 items-center justify-center rounded-md border border-dashed">
-              <p className="text-muted-foreground">
-                Clique em "Atualizar Resultados" para carregar o histórico.
-              </p>
+               {isLoading ? (
+                 <p className="text-muted-foreground">Carregando resultados...</p>
+               ) : (
+                 <p className="text-muted-foreground">
+                   Nenhum resultado para exibir. Clique em "Atualizar Resultados".
+                 </p>
+               )}
             </div>
           )}
         </CardContent>

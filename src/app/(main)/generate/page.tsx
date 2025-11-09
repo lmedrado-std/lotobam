@@ -250,6 +250,14 @@ const getNumberStatsFromFileContent = (content: string) => {
     return { hotNumbers, coldNumbers };
 };
 
+const modeDescriptions: Record<string, string> = {
+  aleatorio: 'Gera apostas com 50 números selecionados de forma totalmente aleatória entre 00 e 99.',
+  completar_manual: 'Você fixa alguns números e o sistema completa o restante aleatoriamente até atingir 50 números.',
+  excluir_numeros: 'Você informa números que não devem aparecer em nenhuma das apostas geradas.',
+  evitar_base: 'Gera apostas evitando números com base em uma fonte de dados, como o histórico de concursos ou um arquivo seu.',
+  ai_strategy: 'A IA analisa o histórico de resultados e sugere apostas com base em estratégias de números quentes, frios ou um mix de ambos.',
+};
+
 
 export default function GeneratePage() {
   const [generatedBets, setGeneratedBets] = useState<Bet[]>([]);
@@ -602,7 +610,7 @@ export default function GeneratePage() {
         <CardHeader>
           <CardTitle>Critérios de Geração</CardTitle>
           <CardDescription>
-            Escolha como suas apostas serão geradas.
+            Escolha como suas apostas serão geradas para obter diferentes resultados e estratégias.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -635,7 +643,7 @@ export default function GeneratePage() {
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      O algoritmo que será usado para gerar os números.
+                      {modeDescriptions[selectedMode] || 'Selecione um modo para ver a descrição.'}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -787,7 +795,7 @@ export default function GeneratePage() {
       <Card>
         <CardHeader>
           <CardTitle>Gerar com Base em Arquivo</CardTitle>
-          <CardDescription>Faça upload de um arquivo (.txt, .csv) com números e use a IA para gerar apostas baseadas na análise estatística desse arquivo.</CardDescription>
+          <CardDescription>Faça upload de um arquivo (.txt, .csv) com seus próprios jogos ou números. A IA irá analisá-lo e gerar novas apostas com base na estratégia que você escolher.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 sm:flex-row">
@@ -986,4 +994,3 @@ export default function GeneratePage() {
   );
 }
 
-    

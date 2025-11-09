@@ -170,30 +170,6 @@ async function parseLotteryFile(file: File): Promise<number[][]> {
     });
 }
 
-
-
-// Helper to format bets into a string
-const formatBets = (bets: Bet[], format: 'csv'): string => {
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  
-  const header = Array.from({ length: 50 }, (_, i) => `num${i + 1}`).join(',');
-  const rows = bets.map(bet => bet.map(pad).join(','));
-  return `id,${header}\n${rows.map((row, i) => `${i + 1},${row}`).join('\n')}`;
-};
-
-// Helper to trigger file download
-const downloadFile = (content: string, fileName: string, contentType: string) => {
-  const blob = new Blob([content], { type: contentType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-};
-
 const LottoGrid = ({ bet }: { bet: Bet }) => {
   const finalGrid = Array.from({ length: 100 }, (_, i) => i).sort((a,b) => {
       if(a === 0) return 1;
@@ -453,12 +429,27 @@ export default function GeneratePage() {
       return;
     }
     
-    const fileContent = formatBets(generatedBets, 'csv');
-    downloadFile(fileContent, `lotobam-apostas.csv`, 'text/csv;charset=utf-8;');
+    // Prepare data for worksheet
+    const header = Array.from({ length: 50 }, (_, i) => `bola_${i + 1}`);
+    const betsAsObjects = generatedBets.map((bet, index) => {
+      const row: { [key: string]: number | string } = { Aposta: `Aposta ${index + 1}` };
+      bet.forEach((num, i) => {
+        row[header[i]] = num;
+      });
+      return row;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(betsAsObjects);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Apostas');
+
+    // Trigger download
+    XLSX.writeFile(workbook, 'lotobam-apostas.xlsx');
+
 
     toast({
       title: 'Exportação Concluída',
-      description: `Seu arquivo .csv foi baixado.`,
+      description: `Seu arquivo .xlsx foi baixado.`,
     });
   }
 
@@ -832,7 +823,7 @@ export default function GeneratePage() {
                    <Bookmark className="mr-2 h-4 w-4"/> Salvar como Modelo
                  </Button>
                   <Button onClick={handleExport}>
-                    <FileSpreadsheet className="mr-2 h-4 w-4"/> Exportar para CSV
+                    <FileSpreadsheet className="mr-2 h-4 w-4"/> Exportar para XLSX
                   </Button>
                  <Button variant="ghost" size="icon" onClick={handleClear} title="Limpar apostas geradas">
                    <Trash2 className="h-4 w-4"/>
@@ -923,3 +914,4 @@ export default function GeneratePage() {
     
 
     
+

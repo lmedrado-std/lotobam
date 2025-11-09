@@ -15,7 +15,7 @@ const AnalyzeImportedDataInputSchema = z.object({
   data: z
     .string()
     .describe(
-      'The imported statistical data, expected to be in CSV or TXT format. Data should contain number, frequency and last_draw_date columns.'
+      'The imported data, which could be from a TXT, CSV, or the content extracted from an XLSX file. The data should contain lottery numbers, statistics, or user notes.'
     ),
   numberOfBets: z
     .number()
@@ -41,18 +41,18 @@ const prompt = ai.definePrompt({
   name: 'analyzeImportedDataPrompt',
   input: {schema: AnalyzeImportedDataInputSchema},
   output: {schema: AnalyzeImportedDataOutputSchema},
-  prompt: `You are an expert lotto analyst. You will analyze the provided lotto statistics data and suggest bet combinations based on the data.
+  prompt: `You are an expert Lotomania analyst. Your task is to analyze the provided data, which may come from various file formats like TXT, CSV, or XLSX, and suggest intelligent bet combinations.
 
-The input data is in CSV or TXT format and contains number, frequency, and last_draw_date columns.
-
-Data:
+The data provided is:
+\`\`\`
 {{data}}
+\`\`\`
 
-You will suggest {{numberOfBets}} bet combinations. Each bet combination must have 50 unique numbers between 0 and 99.
+Based on your analysis of this data, you will suggest {{numberOfBets}} bet combinations. Each bet must contain exactly 50 unique numbers, ranging from 0 to 99.
 
-You should also include a summary of the data analysis performed, including key trends and insights.
+You must also provide a brief summary of your analysis, highlighting any trends, patterns, or key insights you discovered in the data that influenced your suggestions.
 
-Ensure the response can be parsed as valid JSON.
+Please ensure your final response is a valid JSON object that strictly follows the specified output schema.
 `,
 });
 

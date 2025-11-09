@@ -363,7 +363,7 @@ export default function GeneratePage() {
     }
     
     const fileMap = {
-      csv: { extension: 'csv', contentType: 'text/csv' },
+      csv: { extension: 'csv', contentType: 'text/csv;charset=utf-8;' },
       json: { extension: 'json', contentType: 'application/json' },
       txt: { extension: 'txt', contentType: 'text/plain' },
     };
@@ -374,7 +374,7 @@ export default function GeneratePage() {
 
     toast({
       title: 'Exportação Concluída',
-      description: `Seu arquivo no formato ${format.toUpperCase()} foi baixado.`,
+      description: `Seu arquivo foi baixado com sucesso.`,
     });
   }
 
@@ -673,7 +673,7 @@ export default function GeneratePage() {
       <Card>
         <CardHeader>
           <CardTitle>Importar Arquivo</CardTitle>
-          <CardDescription>Faça upload de um arquivo .txt ou .csv para usar como base para a geração ou para evitar números.</CardDescription>
+          <CardDescription>Faça upload de um arquivo (.txt, .csv, .xlsx) para usar como base para a geração ou para evitar números.</CardDescription>
         </CardHeader>
         <CardContent>
           <Input
@@ -681,7 +681,7 @@ export default function GeneratePage() {
             ref={fileInputRef}
             onChange={handleFileChange}
             className="hidden"
-            accept=".csv, .txt, .json"
+            accept=".csv, .txt, .json, .xls, .xlsx"
           />
           <Button variant="outline" onClick={handleUploadClick}>
             <Upload className="mr-2 h-4 w-4" />
@@ -724,11 +724,11 @@ export default function GeneratePage() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => handleExport('csv')}>
                         <FileSpreadsheet className="mr-2 h-4 w-4" />
-                        <span>CSV</span>
+                        <span>Excel (CSV)</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleExport('txt')}>
                         <FileText className="mr-2 h-4 w-4" />
-                        <span>TXT</span>
+                        <span>Texto (TXT)</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleExport('json')}>
                         <FileJson className="mr-2 h-4 w-4" />

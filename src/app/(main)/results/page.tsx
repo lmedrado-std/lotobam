@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -31,25 +32,33 @@ type LottoResult = {
 export default function ResultsPage() {
   const { toast } = useToast();
   const [results, setResults] = useState<LottoResult[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Load results on component mount
   useEffect(() => {
-    handleUpdateResults();
-  }, []);
-
-  const handleUpdateResults = () => {
-    setIsLoading(true);
-    // Simulates a network request to fetch results
+    // Simulates an initial network request to fetch results
     setTimeout(() => {
-      setResults(sampleData.results);
+      // Sort results to ensure the latest is always first
+      const sortedResults = [...sampleData.results].sort((a, b) => b.concurso - a.concurso);
+      setResults(sortedResults);
       setIsLoading(false);
       toast({
         title: 'Resultados Carregados',
-        description: 'O histórico de concursos foi carregado.',
+        description: 'O histórico de concursos foi carregado com sucesso.',
       });
     }, 1000);
+  }, [toast]); // Added toast to dependency array
+
+  const handleUpdateResults = () => {
+    // In a real app, you would fetch only new results.
+    // Here, we just confirm that the data is up-to-date.
+    toast({
+      title: 'Resultados Atualizados',
+      description: 'Você já tem a lista de concursos mais recente.',
+    });
   };
+  
+  const lastContest = results.length > 0 ? results[0].concurso : 'N/A';
 
   return (
     <div className="flex flex-col gap-8">
@@ -58,7 +67,7 @@ export default function ResultsPage() {
           Resultados da Lotomania
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Veja os últimos resultados e atualize a base de dados.
+          Veja os últimos resultados e mantenha a base de dados atualizada.
         </p>
       </div>
 
@@ -67,22 +76,26 @@ export default function ResultsPage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <CardTitle>Histórico de Concursos</CardTitle>
-              <CardDescription>
-                Visualize os resultados dos sorteios anteriores.
-              </CardDescription>
+              {isLoading ? (
+                 <CardDescription>Carregando resultados...</CardDescription>
+              ) : (
+                <CardDescription>
+                  Exibindo {results.length} resultados. Último concurso carregado: {lastContest}.
+                </CardDescription>
+              )}
             </div>
             <Button onClick={handleUpdateResults} disabled={isLoading}>
-              {isLoading ? (
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="mr-2 h-4 w-4" />
-              )}
-              {isLoading ? 'Atualizando...' : 'Atualizar Resultados'}
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Atualizar Resultados
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          {results.length > 0 ? (
+          {isLoading ? (
+            <div className="flex h-64 items-center justify-center rounded-md border border-dashed">
+                 <p className="text-muted-foreground">Carregando resultados...</p>
+            </div>
+          ) : results.length > 0 ? (
             <div className="relative max-h-[600px] overflow-auto">
               <Table>
                 <TableHeader className="sticky top-0 bg-card">
@@ -101,7 +114,7 @@ export default function ResultsPage() {
                       <TableCell>{result.data}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {result.numeros.map((num) => (
+                          {result.numeros.sort((a,b) => a-b).map((num) => (
                             <Badge
                               key={num}
                               variant="secondary"
@@ -119,13 +132,9 @@ export default function ResultsPage() {
             </div>
           ) : (
             <div className="flex h-64 items-center justify-center rounded-md border border-dashed">
-               {isLoading ? (
-                 <p className="text-muted-foreground">Carregando resultados...</p>
-               ) : (
                  <p className="text-muted-foreground">
-                   Nenhum resultado para exibir. Clique em "Atualizar Resultados".
+                   Nenhum resultado para exibir.
                  </p>
-               )}
             </div>
           )}
         </CardContent>

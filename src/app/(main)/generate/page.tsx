@@ -333,7 +333,13 @@ export default function GeneratePage() {
             
             const analyzedData = await analyzeImportedData({ fileContent });
             if (!analyzedData || !analyzedData.results || analyzedData.results.length === 0) {
-              throw new Error("Nenhum número de aposta ou resultado válido foi encontrado no arquivo. Verifique o formato.");
+              toast({
+                variant: "destructive",
+                title: "Arquivo Inválido ou Vazio",
+                description: "Nenhum número de aposta ou resultado válido foi encontrado no arquivo. Verifique o formato.",
+              });
+              setIsGenerating(false);
+              return;
             }
 
             toast({ title: 'Analisando e gerando apostas...', description: `Usando a estratégia "${data.aiStrategy}" com base nos dados do arquivo.` });
@@ -816,10 +822,3 @@ export default function GeneratePage() {
     </div>
   );
 }
-
-
-    
-
-    
-
-

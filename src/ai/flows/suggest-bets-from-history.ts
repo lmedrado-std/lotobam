@@ -89,7 +89,6 @@ const prompt = ai.definePrompt({
   `,
 });
 
-
 const suggestBetsFromHistoryFlow = ai.defineFlow(
   {
     name: 'suggestBetsFromHistoryFlow',
@@ -97,13 +96,27 @@ const suggestBetsFromHistoryFlow = ai.defineFlow(
     outputSchema: SuggestBetsFromHistoryOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input);
-
-    // Basic validation to ensure the AI returned something
-    if (!output) {
-      throw new Error('A IA não retornou uma resposta. Tente novamente.');
+    const maxRetries = 3;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const { output } = await prompt(input);
+        // Basic validation to ensure the AI returned something
+        if (output) {
+          // If successful, return the output immediately
+          return output;
+        }
+      } catch (error) {
+        console.error(`Attempt ${i + 1} failed:`, error);
+        // If this is the last attempt, throw a custom error
+        if (i === maxRetries - 1) {
+          throw new Error(
+            'A IA falhou em gerar uma resposta válida após várias tentativas. Por favor, tente novamente mais tarde.'
+          );
+        }
+      }
     }
-    
-    return output;
+
+    // This should only be reached if the loop completes without returning, which is a fail case.
+    throw new Error('A IA não retornou uma resposta. Tente novamente.');
   }
 );

@@ -89,13 +89,12 @@ const prompt = ai.definePrompt({
   `,
 });
 
+
 const suggestBetsFromHistoryFlow = ai.defineFlow(
   {
     name: 'suggestBetsFromHistoryFlow',
     inputSchema: SuggestBetsFromHistoryInputSchema,
     outputSchema: SuggestBetsFromHistoryOutputSchema,
-    // Add retry logic to handle intermittent AI API failures
-    retries: 3,
   },
   async (input) => {
     const { output } = await prompt(input);
